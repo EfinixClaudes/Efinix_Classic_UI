@@ -73,6 +73,22 @@ local entries = {
     ["CastBar.Spark"] = { path = "Interface\\CastingBar\\UI-CastingBar-Spark", verified = true },
     ["CastBar.Flash"] = { path = "Interface\\CastingBar\\UI-CastingBar-Flash" },
 
+    -- Minimap (Minimap.xml / GameTime.xml 1.12). TrackingBorder is used by QueueStatusFrame.xml,
+    -- the zoom highlight by ExpansionLandingPageMinimapButton, the mask by CompactArenaFrame.xml.
+    ["Minimap.Border"] = { path = "Interface\\Minimap\\UI-Minimap-Border" },
+    ["Minimap.TrackingBorder"] = { path = "Interface\\Minimap\\MiniMap-TrackingBorder", verified = true },
+    ["Minimap.TrackingNone"] = { path = "Interface\\Minimap\\Tracking\\None" },
+    ["Minimap.ZoomInUp"] = { path = "Interface\\Minimap\\UI-Minimap-ZoomInButton-Up" },
+    ["Minimap.ZoomInDown"] = { path = "Interface\\Minimap\\UI-Minimap-ZoomInButton-Down" },
+    ["Minimap.ZoomInDisabled"] = { path = "Interface\\Minimap\\UI-Minimap-ZoomInButton-Disabled" },
+    ["Minimap.ZoomOutUp"] = { path = "Interface\\Minimap\\UI-Minimap-ZoomOutButton-Up" },
+    ["Minimap.ZoomOutDown"] = { path = "Interface\\Minimap\\UI-Minimap-ZoomOutButton-Down" },
+    ["Minimap.ZoomOutDisabled"] = { path = "Interface\\Minimap\\UI-Minimap-ZoomOutButton-Disabled" },
+    ["Minimap.ZoomHighlight"] = { path = "Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight", verified = true },
+    ["Minimap.TimeOfDay"] = { path = "Interface\\Minimap\\UI-TOD-Indicator" },
+    ["Minimap.MailIcon"] = { path = "Interface\\Icons\\INV_Letter_15" },
+    ["Minimap.Mask"] = { path = "Interface\\CharacterFrame\\TempPortraitAlphaMask", verified = true },
+
     -- Classic panel chrome (UIPanelTemplates 1.12). Highlight is referenced by loaded code.
     ["Panel.CloseUp"] = { path = B .. "UI-Panel-MinimizeButton-Up" },
     ["Panel.CloseDown"] = { path = B .. "UI-Panel-MinimizeButton-Down" },

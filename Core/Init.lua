@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-17.5" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-17.6" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -165,9 +165,11 @@ function ns.EnableModule(name)
         module.initialized = true
         module.state = "initialized"
     end
-    if callModule(module, "Enable") then
-        module.state = "enabled"
-    end
+    -- Mark enabled before Enable runs so layout functions the module calls from
+    -- inside Enable (and hooks that fire during it) are not gated off.
+    -- callModule flips the state to "failed" on error.
+    module.state = "enabled"
+    callModule(module, "Enable")
 end
 
 function ns.DisableModule(name)

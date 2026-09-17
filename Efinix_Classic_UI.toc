@@ -29,6 +29,8 @@ Modules\UnitFrames\Party.lua
 
 Modules\CastBar\CastBar.lua
 
+Modules\Minimap\Minimap.lua
+
 Modules\Bags\Bags.lua
 Modules\Bags\Blizzard.lua
 Modules\Bags\Junk.lua
