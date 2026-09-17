@@ -35,6 +35,8 @@ COMMANDS  (type them in the chat box)
 /fcui move reset            puts the frames back to their default places
 /fcui bags columns 12       how many item slots per row in the bag window (4-20)
 /fcui bags bankcolumns 14   same for the bank window (4-24)
+/fcui bags selljunk         sells all grey items (only at a vendor)
+/fcui bags shiftsell off    turns the hold-Shift auto sell and repair off (on = back on)
 /fcui scale 1.1             makes the whole bottom bar bigger or smaller (0.5-2.0)
 /fcui disable Bags          turns a part off. Parts: ActionBars, UnitFrames, Bags.
 /fcui enable Bags           turns it on again. Both need /reload afterwards.
@@ -48,6 +50,9 @@ Press B or click the backpack as usual, everything opens in one window.
 Click a bag icon at the top of the window to hide or show that bag's slots.
 Type in the search box to dim everything that does not match.
 "Sort" tidies the bags. Drag the window by its border to move it.
+The coin icon next to "Sort" sells all grey junk while a vendor is open; the same
+icon sits next to the repair buttons in the vendor window. Holding Shift for about
+one second at a vendor sells all junk and repairs all your gear automatically.
 At a banker the bank window opens next to it. Buying new bank tabs is done
 through the "Blizzard bank" button in the bank window.
 

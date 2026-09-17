@@ -565,6 +565,12 @@ local function createWindow(kind, title)
         end
     end)
 
+    -- Sell junk (inventory only)
+    if kind == "inventory" then
+        window.Junk = Bags.Junk.CreateButton(window, TOGGLE)
+        window.Junk:SetPoint("LEFT", window.Sort, "RIGHT", 8, 0)
+    end
+
     -- Money
     window.Money = CreateFrame("Frame", "FCUI_Bags_" .. kind .. "_Money", window, "SmallMoneyFrameTemplate")
     window.Money:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -6, PADDING)
@@ -630,6 +636,7 @@ end
 
 function Bags:Enable()
     Bags.Blizzard.Enable()
+    Bags.Junk.Enable()
 
     ns.RegisterEvent("BAG_UPDATE", self, function(_, _, bagID)
         Bags.UpdateBag("inventory", bagID)

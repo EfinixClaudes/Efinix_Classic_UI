@@ -312,8 +312,12 @@ SlashCmdList.FCUI = function(input)
             ns.Bags.SetColumns("inventory", math.max(4, math.min(20, tonumber(value))))
         elseif kind == "bankcolumns" and tonumber(value) then
             ns.Bags.SetColumns("bank", math.max(4, math.min(24, tonumber(value))))
+        elseif rest == "shiftsell on" or rest == "shiftsell off" then
+            ns.Bags.Junk.SetShiftSell(rest == "shiftsell on")
+        elseif rest == "selljunk" then
+            ns.Bags.Junk.Sell()
         else
-            ns.Print("usage: /fcui bags columns <4-20> | /fcui bags bankcolumns <4-24>")
+            ns.Print("usage: /fcui bags columns <4-20> | bankcolumns <4-24> | shiftsell on|off | selljunk")
         end
     elseif cmd == "reset" then
         ns.DB.Reset()

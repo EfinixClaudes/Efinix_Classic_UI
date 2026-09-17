@@ -16,6 +16,7 @@ local DEFAULTS = {
     bags = {
         columns = 10,
         bankColumns = 14,
+        shiftSell = true, -- hold Shift at a vendor to sell grey items
         hidden = {}, -- kind -> bagID -> true
         positions = {}, -- kind -> {point, x, y}
     },

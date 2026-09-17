@@ -27,3 +27,4 @@ Modules\UnitFrames\UnitFrames.lua
 
 Modules\Bags\Bags.lua
 Modules\Bags\Blizzard.lua
+Modules\Bags\Junk.lua
