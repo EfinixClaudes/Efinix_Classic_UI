@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-17.10" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-17.11" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -251,6 +251,12 @@ local function status()
         ns.Print("missing textures (%d): %s", #missing, table.concat(missing, ", "))
     else
         ns.Print("all %d verified textures present", ns.Assets.Count())
+    end
+    -- modules that probe their own files log "missing texture <path>"
+    for _, line in ipairs(ns.log) do
+        if line:find("missing texture", 1, true) then
+            ns.Print(line)
+        end
     end
 end
 

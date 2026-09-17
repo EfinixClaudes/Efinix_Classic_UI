@@ -25,6 +25,9 @@ local function file(key)
     if present[key] == nil then
         local exists = ns.Compat.TextureExists(FILES[key])
         present[key] = exists ~= false
+        if not present[key] then
+            ns.Log("UnitFrames", "missing texture %s", FILES[key])
+        end
     end
     return present[key] and FILES[key] or nil
 end

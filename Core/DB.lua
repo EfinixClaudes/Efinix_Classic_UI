@@ -4,7 +4,7 @@ local DB = {}
 ns.DB = DB
 
 local DEFAULTS = {
-    version = 2,
+    version = 3,
     scale = 1,
     modules = {
         ActionBars = true,
@@ -49,6 +49,11 @@ local migrations = {
     -- 2: added UnitFrames/Bags modules and their settings; copyDefaults fills them in.
     [2] = function(db)
         db.positions = db.positions or {}
+    end,
+    -- 3: frame positions are now centre offsets from the UIParent centre; the old
+    -- entries mixed anchor points and are unusable, so they are dropped.
+    [3] = function(db)
+        db.positions = {}
     end,
 }
 

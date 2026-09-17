@@ -45,6 +45,8 @@ local function entryFor(name)
 end
 
 -- Apply the saved position, or the 1.12 default, to the Blizzard frame. Out of combat only.
+-- Saved positions are the frame centre's offset from the UIParent centre, in UIParent
+-- units; SetPoint offsets are in the frame's own scale, so divide by it.
 function UF.ApplyPosition(name)
     local frame = _G[name]
     if not frame then
@@ -54,8 +56,12 @@ function UF.ApplyPosition(name)
     local entry = entryFor(name)
     Combat.Run("ufpos:" .. name, function()
         if pos then
+            local scale = frame:GetScale()
+            if not scale or scale <= 0 then
+                scale = 1
+            end
             Raw.ClearAllPoints(frame)
-            Raw.SetPoint(frame, pos.point, UIParent, pos.point, pos.x, pos.y)
+            Raw.SetPoint(frame, "CENTER", UIParent, "CENTER", pos.x / scale, pos.y / scale)
         elseif entry and entry.default then
             local default = entry.default
             local relativeTo = default.relativeTo and _G[default.relativeTo] or UIParent
@@ -73,8 +79,13 @@ end
 
 local function savePositionFromMover(mover)
     local frame = mover.target
-    local point, _, _, x, y = mover:GetPoint(1)
-    ns.db.positions[frame:GetName()] = { point = point, x = x, y = y }
+    -- the mover lives on UIParent at scale 1, so its centre is already in UIParent units
+    local cx, cy = mover:GetCenter()
+    local ux, uy = UIParent:GetCenter()
+    if not cx or not ux then
+        return
+    end
+    ns.db.positions[frame:GetName()] = { point = "CENTER", x = cx - ux, y = cy - uy }
     UF.ApplyPosition(frame:GetName())
 end
 
@@ -123,12 +134,14 @@ end
 
 local function syncMoverToFrame(mover)
     local frame = mover.target
+    -- GetSize/GetCenter report in the frame's own scale; convert to UIParent units
+    local ratio = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
     local width, height = frame:GetSize()
-    mover:SetSize(math.max(width, 40), math.max(height, 20))
+    mover:SetSize(math.max(width * ratio, 40), math.max(height * ratio, 20))
     local x, y = frame:GetCenter()
     mover:ClearAllPoints()
     if x and y then
-        mover:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x, y)
+        mover:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x * ratio, y * ratio)
     else
         mover:SetPoint("CENTER")
     end
