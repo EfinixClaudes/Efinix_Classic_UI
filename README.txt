@@ -1,3 +1,7 @@
+If you want to support the project feel free to donate here:
+paypal.me/Efinix
+
+
 Efinix Classic UI
 =================
 
