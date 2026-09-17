@@ -311,7 +311,7 @@ local function getToggle(window, index)
         local hidden = settings().hidden
         hidden[window.kind] = hidden[window.kind] or {}
         hidden[window.kind][self.bagID] = not hidden[window.kind][self.bagID] or nil
-        Bags.Refresh(window.kind, true)
+        Bags.RefreshWindow(window.kind, true)
     end)
     toggle:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -360,7 +360,7 @@ local function columnsFor(kind)
     return settings().columns or 10
 end
 
-function Bags.Refresh(kind, relayout)
+function Bags.RefreshWindow(kind, relayout)
     local window = Bags.windows[kind]
     if not window or not window:IsShown() then
         return
@@ -449,7 +449,7 @@ end
 
 function Bags.RefreshAll(relayout)
     for kind in pairs(Bags.windows) do
-        Bags.Refresh(kind, relayout)
+        Bags.RefreshWindow(kind, relayout)
     end
 end
 
@@ -495,7 +495,7 @@ local function createWindow(kind, title)
         savePosition(self)
     end)
     window:SetScript("OnShow", function(self)
-        Bags.Refresh(self.kind, true)
+        Bags.RefreshWindow(self.kind, true)
         if self.Money then
             MoneyFrame_UpdateMoney(self.Money)
         end
@@ -623,7 +623,7 @@ function Bags.SetColumns(kind, columns)
     else
         settings().columns = columns
     end
-    Bags.Refresh(kind, true)
+    Bags.RefreshWindow(kind, true)
 end
 
 ---------------------------------------------------------------------------
@@ -667,10 +667,10 @@ function Bags:Enable()
         Bags.RefreshAll()
     end)
     ns.RegisterEvent("BANK_TABS_CHANGED", self, function()
-        Bags.Refresh("bank", true)
+        Bags.RefreshWindow("bank", true)
     end)
     ns.RegisterEvent("PLAYERBANKSLOTS_CHANGED", self, function()
-        Bags.Refresh("bank")
+        Bags.RefreshWindow("bank")
     end)
     ns.RegisterEvent("PLAYER_ENTERING_WORLD", self, function()
         Bags.RefreshAll(true)
