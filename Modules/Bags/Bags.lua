@@ -447,10 +447,16 @@ function Bags.UpdateBag(kind, bagID)
     end
 end
 
+local refreshing = false
 function Bags.RefreshAll(relayout)
+    if refreshing then
+        return
+    end
+    refreshing = true
     for kind in pairs(Bags.windows) do
         Bags.RefreshWindow(kind, relayout)
     end
+    refreshing = false
 end
 
 ---------------------------------------------------------------------------

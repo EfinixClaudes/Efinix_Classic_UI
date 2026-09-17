@@ -3,6 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
+ns.BUILD = "2026-09-17.3" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -214,6 +215,7 @@ ns.RegisterEvent("PLAYER_LOGIN", ns, function()
     ns.RegisterEvent("PLAYER_ENTERING_WORLD", ns, function()
         ns.RefreshAll()
     end)
+    ns.Print("build %s loaded", ns.BUILD)
 end)
 
 ---------------------------------------------------------------------------
@@ -221,6 +223,7 @@ end)
 ---------------------------------------------------------------------------
 local function status()
     local facts = ns.Compat.Facts()
+    ns.Print("addon build %s", ns.BUILD)
     ns.Print(
         "client %s (%s) interface %s, project %s",
         facts.version,
