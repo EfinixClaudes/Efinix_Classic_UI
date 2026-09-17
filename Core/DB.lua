@@ -11,6 +11,7 @@ local DEFAULTS = {
         UnitFrames = true,
         CastBar = true,
         Minimap = true,
+        Auras = true,
         Bags = true,
     },
     -- UnitFrames: player-chosen frame positions, name -> {point, x, y} on UIParent
