@@ -13,6 +13,7 @@ local DEFAULTS = {
         Minimap = true,
         Auras = true,
         Chat = true,
+        Tooltip = true,
         Bags = true,
     },
     -- UnitFrames: player-chosen frame positions, name -> {point, x, y} on UIParent

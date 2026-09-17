@@ -35,6 +35,8 @@ Modules\Auras\Auras.lua
 
 Modules\Chat\Chat.lua
 
+Modules\Tooltip\Tooltip.lua
+
 Modules\Bags\Bags.lua
 Modules\Bags\Blizzard.lua
 Modules\Bags\Junk.lua
