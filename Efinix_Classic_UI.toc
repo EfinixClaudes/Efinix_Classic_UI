@@ -1,0 +1,29 @@
+## Interface: 16001
+## Title: Efinix Classic UI
+## Notes: Restores the original 2004-2006 Vanilla interface on World of Warcraft: Forever.
+## Author: Sebi
+## Version: @project-version@
+## SavedVariables: ForeverClassicUIDB
+## IconTexture: Interface\Icons\INV_Misc_Book_09
+## X-Website: https://github.com/EfinixClaudes/Efinix_Classic_UI
+## X-License: MIT
+## X-Category: Interface Enhancements
+
+Core\Init.lua
+Core\Compat.lua
+Core\Combat.lua
+Core\Hide.lua
+Core\Assets.lua
+Core\DB.lua
+
+Modules\ActionBars\ActionBars.lua
+Modules\ActionBars\MainBar.lua
+Modules\ActionBars\Buttons.lua
+Modules\ActionBars\StatusBars.lua
+Modules\ActionBars\MicroMenu.lua
+Modules\ActionBars\BagBar.lua
+
+Modules\UnitFrames\UnitFrames.lua
+
+Modules\Bags\Bags.lua
+Modules\Bags\Blizzard.lua

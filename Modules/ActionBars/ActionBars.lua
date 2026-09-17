@@ -1,0 +1,388 @@
+local _, ns = ...
+
+-- ActionBars module: main bar art, gryphons, page arrows, XP/rep bar, micro
+-- menu, bag bar, multi bars, stance bar and pet bar, all reskinned in place.
+-- Strategy and reasoning: docs/adr/0002-actionbars-reskin-in-place.md.
+--
+-- Every number below comes from the 1.12 FrameXML in reference/vanilla/1.12
+-- and is cited at the point of use.
+local Raw = ns.Raw
+local Combat = ns.Combat
+
+local AB = ns.RegisterModule("ActionBars", {})
+ns.ActionBars = AB
+
+-- Layout constants (1.12 FrameXML)
+AB.BAR_WIDTH = 1024 -- MainMenuBar.xml: MainMenuBar 1024x53
+AB.BAR_HEIGHT = 53
+AB.BUTTON = 36 -- ActionButtonTemplate.xml: 36x36
+AB.BUTTON_SPACING = 6 -- ActionBarFrame.xml: ActionButton2 LEFT of ActionButton1 RIGHT +6
+AB.SMALL_BUTTON = 30 -- BonusActionBarFrame.xml ShapeshiftButtonTemplate / PetActionButtonTemplate 30x30
+AB.STANCE_SPACING = 7 -- BonusActionBarFrame.xml: ShapeshiftButton2 LEFT +7
+AB.PET_SPACING = 8 -- PetActionBarFrame.xml: PetActionButton2 LEFT +8
+AB.MULTIBAR_VERTICAL_SPACING = 6 -- MultiActionBars.xml: $parentButton2 TOP of $parentButton1 BOTTOM -6
+
+-- 1.12 UIParent.lua UIPARENT_MANAGED_FRAME_POSITIONS offsets
+local OFFSET_REPUTATION = 9 -- "reputation = 9": XP bar and rep watch bar both shown
+local OFFSET_MAXLEVEL = -5 -- "maxLevel = -5": max level trim shown instead of XP bar
+local OFFSET_STANCE_BOTTOMLEFT = 45 -- ShapeshiftBarFrame "bottomLeft = 45"
+local OFFSET_PET_BOTTOMLEFT = 43 -- PETACTIONBAR_YPOS "bottomLeft = 43"
+local PETACTIONBAR_YPOS = 97 -- PETACTIONBAR_YPOS "baseY = 97"
+local PETACTIONBAR_XPOS = 36 -- PetActionBarFrame.lua: PETACTIONBAR_XPOS = 36
+
+AB.hooked = {} -- frame -> true, so hooks are installed once
+
+-- Bars we manage. Resolved at Init because a missing global must degrade, not error.
+local BAR_NAMES = {
+    "MainActionBar",
+    "MultiBarBottomLeft",
+    "MultiBarBottomRight",
+    "MultiBarRight",
+    "MultiBarLeft",
+    "StanceBar",
+    "PetActionBar",
+}
+
+---------------------------------------------------------------------------
+-- Helpers
+---------------------------------------------------------------------------
+local function shown(frame)
+    -- Edit Mode overrides IsShown on action bars to report the *intended*
+    -- state; we need the real one for layout. Raw.IsShown is the widget method.
+    return frame and Raw.IsShown(frame) or false
+end
+
+function AB.Hook(frame, method, fn)
+    if not frame or type(frame[method]) ~= "function" then
+        return false
+    end
+    local key = tostring(frame) .. ":" .. method
+    if AB.hooked[key] then
+        return true
+    end
+    AB.hooked[key] = true
+    hooksecurefunc(frame, method, fn)
+    return true
+end
+
+function AB.HookScript(frame, script, fn)
+    if not frame then
+        return
+    end
+    local key = tostring(frame) .. ":script:" .. script
+    if AB.hooked[key] then
+        return
+    end
+    AB.hooked[key] = true
+    frame:HookScript(script, fn)
+end
+
+---------------------------------------------------------------------------
+-- Layout flags (1.12 UIParent_ManageFramePositions)
+---------------------------------------------------------------------------
+local function bottomLeftShown()
+    return shown(MultiBarBottomLeft)
+end
+
+local function statusOffset()
+    local y = 0
+    if AB.StatusBars and AB.StatusBars.IsReputationStacked() then
+        y = y + OFFSET_REPUTATION
+    end
+    if AB.StatusBars and AB.StatusBars.IsMaxLevelBarShown() then
+        y = y + OFFSET_MAXLEVEL
+    end
+    return y
+end
+
+---------------------------------------------------------------------------
+-- Positioning. Called after every Edit Mode layout pass and whenever a bar
+-- shows or hides. Only raw widget methods on non-protected frames, so this
+-- is safe in combat; button sizes are handled in Buttons.lua via the queue.
+---------------------------------------------------------------------------
+local positioning = false
+function AB.Position()
+    if positioning or not AB.frame then
+        return
+    end
+    positioning = true
+
+    local art = AB.frame
+    local scale = ns.db.scale or 1
+    local yStatus = statusOffset()
+
+    Raw.SetScale(art, scale)
+
+    -- MainMenuBar.xml / ActionBarFrame.xml: ActionButton1 at BOTTOMLEFT of MainMenuBarArtFrame 8,4
+    if MainActionBar then
+        Raw.SetScale(MainActionBar, scale)
+        Raw.ClearAllPoints(MainActionBar)
+        Raw.SetPoint(MainActionBar, "BOTTOMLEFT", art, "BOTTOMLEFT", 8, 4)
+    end
+
+    -- MultiActionBars.xml: MultiBarBottomLeft BOTTOMLEFT to ActionButton1 TOPLEFT 0,17
+    -- (UIParent.lua: baseY 17, reputation +9, maxLevel -5)
+    if MultiBarBottomLeft then
+        Raw.SetScale(MultiBarBottomLeft, scale)
+        Raw.ClearAllPoints(MultiBarBottomLeft)
+        Raw.SetPoint(MultiBarBottomLeft, "BOTTOMLEFT", art, "BOTTOMLEFT", 8, 4 + AB.BUTTON + 17 + yStatus)
+    end
+
+    -- MultiActionBars.xml: MultiBarBottomRight LEFT to MultiBarBottomLeft RIGHT 10,0
+    if MultiBarBottomRight and MultiBarBottomLeft then
+        Raw.SetScale(MultiBarBottomRight, scale)
+        Raw.ClearAllPoints(MultiBarBottomRight)
+        Raw.SetPoint(MultiBarBottomRight, "LEFT", MultiBarBottomLeft, "RIGHT", 10, 0)
+    end
+
+    -- MultiActionBars.xml: MultiBarRight (38x500, buttons from TOPRIGHT) at BOTTOMRIGHT -7,98,
+    -- so the first button's top edge sits at 598 from the screen bottom.
+    if MultiBarRight then
+        Raw.SetScale(MultiBarRight, scale)
+        Raw.ClearAllPoints(MultiBarRight)
+        Raw.SetPoint(MultiBarRight, "TOPRIGHT", UIParent, "BOTTOMRIGHT", -7, 98 + 500)
+    end
+
+    -- MultiActionBars.xml: MultiBarLeft TOPRIGHT to MultiBarRight TOPLEFT -5,0
+    if MultiBarLeft and MultiBarRight then
+        Raw.SetScale(MultiBarLeft, scale)
+        Raw.ClearAllPoints(MultiBarLeft)
+        Raw.SetPoint(MultiBarLeft, "TOPRIGHT", MultiBarRight, "TOPLEFT", -5, 0)
+    end
+
+    -- BonusActionBarFrame.xml: ShapeshiftBarFrame BOTTOMLEFT to MainMenuBar TOPLEFT 30,0;
+    -- ShapeshiftButton1 at 11,3 inside. UIParent.lua: bottomLeft +45, reputation +9, maxLevel -5.
+    local stanceY = AB.BAR_HEIGHT + 3 + yStatus
+    if bottomLeftShown() then
+        stanceY = stanceY + OFFSET_STANCE_BOTTOMLEFT
+    end
+    if StanceBar then
+        Raw.SetScale(StanceBar, scale)
+        Raw.ClearAllPoints(StanceBar)
+        Raw.SetPoint(StanceBar, "BOTTOMLEFT", art, "BOTTOMLEFT", 30 + 11, stanceY)
+    end
+    AB.UpdateStanceArt(stanceY)
+
+    -- PetActionBarFrame.xml: PetActionBarFrame (509x43) TOPLEFT to MainMenuBar BOTTOMLEFT 36,PETACTIONBAR_YPOS;
+    -- PetActionButton1 at BOTTOMLEFT 36,2 inside. UIParent.lua: baseY 97, bottomLeft +43, reputation +9, maxLevel -5.
+    local petY = PETACTIONBAR_YPOS + yStatus
+    if bottomLeftShown() then
+        petY = petY + OFFSET_PET_BOTTOMLEFT
+    end
+    local petX = PETACTIONBAR_XPOS
+    if StanceBar and shown(StanceBar) then
+        -- PetActionBarFrame.lua: PETACTIONBAR_XPOS = last ShapeshiftButton:GetRight() + 20
+        local stanceRight = StanceBar:GetRight()
+        local artLeft = art:GetLeft()
+        if stanceRight and artLeft then
+            petX = (stanceRight - artLeft) / scale + 20
+        end
+    end
+    if PetActionBar then
+        Raw.SetScale(PetActionBar, scale)
+        Raw.ClearAllPoints(PetActionBar)
+        Raw.SetPoint(PetActionBar, "BOTTOMLEFT", art, "BOTTOMLEFT", petX + 36, petY - 43 + 2)
+    end
+    AB.UpdatePetArt(petX, petY)
+
+    if AB.StatusBars then
+        AB.StatusBars.Position()
+    end
+    if AB.MicroMenu then
+        AB.MicroMenu.Position()
+    end
+    if AB.BagBar then
+        AB.BagBar.Position()
+    end
+
+    positioning = false
+end
+
+---------------------------------------------------------------------------
+-- Stance bar art (BonusActionBarFrame.xml / BonusActionBarFrame.lua ShapeshiftBar_Update)
+---------------------------------------------------------------------------
+function AB.CreateStanceArt()
+    local ends = ns.Assets.Get("StanceBar.Ends")
+    local middle = ns.Assets.Get("StanceBar.Middle")
+    if not ends or not middle or AB.stanceArt then
+        return
+    end
+    local frame = CreateFrame("Frame", nil, AB.frame)
+    frame:SetSize(29, 32) -- ShapeshiftBarFrame 29x32
+    frame:SetFrameLevel(AB.frame:GetFrameLevel())
+    -- ShapeshiftBarLeft 45x50 at BOTTOMLEFT
+    frame.Left = frame:CreateTexture(nil, "BACKGROUND")
+    frame.Left:SetTexture(ends)
+    frame.Left:SetSize(45, 50)
+    frame.Left:SetPoint("BOTTOMLEFT")
+    frame.Left:SetTexCoord(0, 0.703125, 0, 0.78125) -- ShapeshiftBarEnds left half: 45/64, 50/64
+    -- ShapeshiftBarMiddle 38x50, horizontally tiled by ShapeshiftBar_Update
+    frame.Middle = frame:CreateTexture(nil, "BACKGROUND")
+    frame.Middle:SetTexture(middle, "REPEAT")
+    frame.Middle:SetSize(38, 50)
+    frame.Middle:SetPoint("LEFT", frame.Left, "RIGHT")
+    -- ShapeshiftBarRight 42x50
+    frame.Right = frame:CreateTexture(nil, "BACKGROUND")
+    frame.Right:SetTexture(ends)
+    frame.Right:SetSize(42, 50)
+    frame.Right:SetTexCoord(0.34375, 1, 0, 0.78125) -- ShapeshiftBarEnds right half: 42/64 from the right
+    frame:Hide()
+    AB.stanceArt = frame
+end
+
+function AB.UpdateStanceArt(stanceY)
+    local frame = AB.stanceArt
+    if not frame then
+        return
+    end
+    local numForms = GetNumShapeshiftForms and GetNumShapeshiftForms() or 0
+    -- UIParent_ManageFramePositions: art hidden while MultiBarBottomLeft is shown
+    if not StanceBar or not shown(StanceBar) or numForms == 0 or bottomLeftShown() then
+        frame:Hide()
+        return
+    end
+    frame:ClearAllPoints()
+    -- ShapeshiftBarFrame BOTTOMLEFT to MainMenuBar TOPLEFT 30,yOffset
+    frame:SetPoint("BOTTOMLEFT", AB.frame, "BOTTOMLEFT", 30, stanceY - 3)
+    -- ShapeshiftBar_Update: 1 form -> right cap 12px into the left cap, 2 forms -> caps touch,
+    -- more -> middle 38px per extra form with repeating texcoords
+    frame.Right:ClearAllPoints()
+    if numForms == 1 then
+        frame.Middle:Hide()
+        frame.Right:SetPoint("LEFT", frame.Left, "LEFT", 12, 0)
+    elseif numForms == 2 then
+        frame.Middle:Hide()
+        frame.Right:SetPoint("LEFT", frame.Left, "RIGHT", 0, 0)
+    else
+        frame.Middle:Show()
+        frame.Middle:SetWidth(38 * (numForms - 2))
+        frame.Middle:SetTexCoord(0, numForms - 2, 0, 1)
+        frame.Right:SetPoint("LEFT", frame.Middle, "RIGHT", 0, 0)
+    end
+    frame:Show()
+end
+
+---------------------------------------------------------------------------
+-- Pet bar art (PetActionBarFrame.xml SlidingActionBarTexture0/1)
+---------------------------------------------------------------------------
+function AB.CreatePetArt()
+    local tex = ns.Assets.Get("PetBar.Art")
+    if not tex or AB.petArt then
+        return
+    end
+    local frame = CreateFrame("Frame", nil, AB.frame)
+    frame:SetSize(509, 43) -- PetActionBarFrame 509x43
+    frame:SetFrameLevel(AB.frame:GetFrameLevel())
+    local t0 = frame:CreateTexture(nil, "OVERLAY")
+    t0:SetTexture(tex)
+    t0:SetSize(256, 44)
+    t0:SetPoint("TOPLEFT")
+    t0:SetTexCoord(0, 1, 0.015625, 0.359375)
+    local t1 = frame:CreateTexture(nil, "OVERLAY")
+    t1:SetTexture(tex)
+    t1:SetSize(184, 44)
+    t1:SetPoint("LEFT", t0, "RIGHT")
+    t1:SetTexCoord(0, 0.71875, 0.375, 0.71875)
+    frame:Hide()
+    AB.petArt = frame
+end
+
+function AB.UpdatePetArt(petX, petY)
+    local frame = AB.petArt
+    if not frame then
+        return
+    end
+    -- UIParent_ManageFramePositions: SlidingActionBarTexture hidden while MultiBarBottomLeft is shown
+    if not PetActionBar or not shown(PetActionBar) or bottomLeftShown() then
+        frame:Hide()
+        return
+    end
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", AB.frame, "BOTTOMLEFT", petX, petY)
+    frame:Show()
+end
+
+---------------------------------------------------------------------------
+-- Module lifecycle
+---------------------------------------------------------------------------
+function AB:Init()
+    if not MainActionBar then
+        error("MainActionBar not found; this client does not match docs/CLIENT_FACTS.md")
+    end
+    self.bars = {}
+    for _, name in ipairs(BAR_NAMES) do
+        local bar = _G[name]
+        if bar then
+            table.insert(self.bars, bar)
+        else
+            ns.Log("ActionBars", "bar %s missing", name)
+        end
+    end
+    AB.MainBar.Create()
+    AB.CreateStanceArt()
+    AB.CreatePetArt()
+end
+
+function AB:Enable()
+    local frame = AB.frame
+    frame:Show()
+
+    -- Buttons: reskin and lay out containers for every bar we own.
+    for _, bar in ipairs(self.bars) do
+        AB.Buttons.SetupBar(bar)
+        AB.HookScript(bar, "OnShow", AB.Position)
+        AB.HookScript(bar, "OnHide", AB.Position)
+        -- Edit Mode re-anchors each system in ApplySystemAnchor and again in
+        -- UpdateBottomActionBarPositions / UpdateRightActionBarPositions.
+        AB.Hook(bar, "ApplySystemAnchor", AB.Position)
+    end
+    if EditModeManagerFrame then
+        AB.Hook(EditModeManagerFrame, "UpdateBottomActionBarPositions", AB.Position)
+        AB.Hook(EditModeManagerFrame, "UpdateRightActionBarPositions", AB.Position)
+    end
+
+    AB.MainBar.Enable()
+    AB.StatusBars.Enable()
+    AB.MicroMenu.Enable()
+    AB.BagBar.Enable()
+
+    ns.RegisterEvent("UPDATE_SHAPESHIFT_FORMS", self, AB.Position)
+    ns.RegisterEvent("UPDATE_SHAPESHIFT_FORM", self, AB.Position)
+    ns.RegisterEvent("PET_BAR_UPDATE", self, AB.Position)
+    ns.RegisterEvent("PLAYER_ENTERING_WORLD", self, AB.Position)
+
+    AB.Position()
+end
+
+function AB:Disable()
+    -- Reskins cannot be fully undone without a reload; hide our art and stop reacting.
+    ns.UnregisterAllEvents(self)
+    if AB.frame then
+        AB.frame:Hide()
+    end
+    ns.Print("ActionBars disabled, /reload to restore the Blizzard layout")
+end
+
+function AB:Refresh()
+    AB.Position()
+end
+
+function AB:Diag()
+    ns.Print("art frame shown=%s scale=%.2f", tostring(AB.frame and AB.frame:IsShown()), ns.db.scale or 1)
+    for _, bar in ipairs(self.bars or {}) do
+        local point, relativeTo, relativePoint, x, y = bar:GetPoint(1)
+        ns.Print(
+            "  %-20s shown=%s %s -> %s %s (%.1f, %.1f) size %.0fx%.0f",
+            bar:GetName(),
+            tostring(shown(bar)),
+            tostring(point),
+            tostring(relativeTo and relativeTo:GetName()),
+            tostring(relativePoint),
+            x or 0,
+            y or 0,
+            bar:GetWidth(),
+            bar:GetHeight()
+        )
+    end
+    ns.Print("combat queue pending: %d", Combat.Pending())
+end
