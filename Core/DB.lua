@@ -14,8 +14,12 @@ local DEFAULTS = {
         Auras = true,
         Chat = true,
         Tooltip = true,
+        Nameplates = true,
+        RaidFrames = true,
         Bags = true,
     },
+    -- Nameplates: the player's nameplateStyle cvar before we switched it to Classic
+    nameplates = { previousStyle = nil },
     -- UnitFrames: player-chosen frame positions, name -> {point, x, y} on UIParent
     positions = {},
     bags = {

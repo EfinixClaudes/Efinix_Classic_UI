@@ -7,7 +7,10 @@ Efinix Classic UI
 
 Brings the original 2004-2006 Vanilla interface back to World of Warcraft: Forever:
 the carved main bar with gryphons, the small 36 px action buttons, the purple XP bar,
-the old micro menu and bag buttons, a classic-styled all-in-one bag window and
+the old micro menu and bag buttons, the old player/target/pet/party frames, the
+thin yellow cast bar, the round minimap with its sun/moon icon, buffs and debuffs
+in the top right corner, the old chat frame with its scroll buttons, the dark blue
+tooltips, the classic nameplates, a classic-styled all-in-one bag window and
 unit frames you can drag wherever you like.
 
 
@@ -38,9 +41,29 @@ COMMANDS  (type them in the chat box)
 /fcui bags selljunk         sells all grey items (only at a vendor)
 /fcui bags shiftsell off    turns the hold-Shift auto sell and repair off (on = back on)
 /fcui scale 1.1             makes the whole bottom bar bigger or smaller (0.5-2.0)
-/fcui disable Bags          turns a part off. Parts: ActionBars, UnitFrames, Bags.
+/fcui disable Bags          turns a part off. Parts: ActionBars, UnitFrames, CastBar,
+                            Minimap, Auras, Chat, Tooltip, Nameplates, RaidFrames, Bags.
 /fcui enable Bags           turns it on again. Both need /reload afterwards.
 /fcui reset                 forgets all settings, then /reload
+
+
+GOOD TO KNOW
+------------
+
+Minimap: the clock, the calendar button and the addon button are hidden like in
+2006. Click the sun/moon icon at the top right of the minimap to open the calendar.
+The tracking icon left of the minimap still opens the tracking menu.
+Chat: the chat tabs only appear while your mouse is over the chat frame, as they
+did back then. If your text box sits at the top of the chat frame, set
+"Chat Style" to "Classic" in the Interface options.
+Nameplates: the addon switches the game's nameplate style to its hidden "Classic"
+look. Turning the Nameplates part off (or removing the addon after
+/fcui disable Nameplates) puts your old style back.
+Raid frames: the modern compact raid frames are hidden. Use the raid tab of the
+social window and drag groups out of it, as in 2006.
+Edit Mode still works for things the addon does not manage; positions and sizes
+of the frames listed above are set by the addon, except the chat frame and the
+tooltip, which keep a position you gave them in Edit Mode.
 
 
 BAGS
