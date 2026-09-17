@@ -24,6 +24,8 @@ Modules\ActionBars\MicroMenu.lua
 Modules\ActionBars\BagBar.lua
 
 Modules\UnitFrames\UnitFrames.lua
+Modules\UnitFrames\Skin.lua
+Modules\UnitFrames\Party.lua
 
 Modules\Bags\Bags.lua
 Modules\Bags\Blizzard.lua

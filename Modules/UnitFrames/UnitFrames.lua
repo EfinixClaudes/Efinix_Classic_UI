@@ -14,11 +14,18 @@ local Combat = ns.Combat
 local UF = ns.RegisterModule("UnitFrames", {})
 ns.UnitFrames = UF
 
+-- 1.12 default anchors (PlayerFrame.xml, TargetFrame.xml, PetFrame.xml, PartyFrame.xml).
+-- FocusFrame did not exist in Vanilla and keeps Blizzard's default.
 local MOVABLE = {
-    { name = "PlayerFrame", label = "Player" },
-    { name = "TargetFrame", label = "Target" },
+    { name = "PlayerFrame", label = "Player", default = { point = "TOPLEFT", x = -19, y = -4 } },
+    { name = "TargetFrame", label = "Target", default = { point = "TOPLEFT", x = 250, y = -4 } },
     { name = "FocusFrame", label = "Focus" },
-    { name = "PetFrame", label = "Pet" },
+    {
+        name = "PetFrame",
+        label = "Pet",
+        default = { point = "TOPLEFT", relativeTo = "PlayerFrame", relativePoint = "TOPLEFT", x = 80, y = -60 },
+    },
+    { name = "PartyFrame", label = "Party", default = { point = "TOPLEFT", x = 10, y = -128 } },
 }
 
 UF.movers = {}
@@ -28,16 +35,33 @@ local function savedPosition(name)
     return ns.db.positions and ns.db.positions[name]
 end
 
--- Apply the saved position to the Blizzard frame. Out of combat only.
+local function entryFor(name)
+    for _, entry in ipairs(MOVABLE) do
+        if entry.name == name then
+            return entry
+        end
+    end
+    return nil
+end
+
+-- Apply the saved position, or the 1.12 default, to the Blizzard frame. Out of combat only.
 function UF.ApplyPosition(name)
     local frame = _G[name]
-    local pos = savedPosition(name)
-    if not frame or not pos then
+    if not frame then
         return
     end
+    local pos = savedPosition(name)
+    local entry = entryFor(name)
     Combat.Run("ufpos:" .. name, function()
-        Raw.ClearAllPoints(frame)
-        Raw.SetPoint(frame, pos.point, UIParent, pos.point, pos.x, pos.y)
+        if pos then
+            Raw.ClearAllPoints(frame)
+            Raw.SetPoint(frame, pos.point, UIParent, pos.point, pos.x, pos.y)
+        elseif entry and entry.default then
+            local default = entry.default
+            local relativeTo = default.relativeTo and _G[default.relativeTo] or UIParent
+            Raw.ClearAllPoints(frame)
+            Raw.SetPoint(frame, default.point, relativeTo, default.relativePoint or default.point, default.x, default.y)
+        end
     end)
 end
 
@@ -158,12 +182,29 @@ function UF:Enable()
             end
         end
     end
-    ns.RegisterEvent("PLAYER_ENTERING_WORLD", self, UF.ApplyAll)
+    -- Blizzard's player-bottom container re-anchors PetFrame in its Layout
+    if PlayerBottomManagedFrameContainer and type(PlayerBottomManagedFrameContainer.Layout) == "function" then
+        hooksecurefunc(PlayerBottomManagedFrameContainer, "Layout", function()
+            UF.ApplyPosition("PetFrame")
+        end)
+    end
+    ns.RegisterEvent("PLAYER_ENTERING_WORLD", self, function()
+        UF.ApplyAll()
+        if UF.Skin then
+            UF.Skin.Refresh()
+        end
+    end)
     ns.RegisterEvent("PLAYER_REGEN_DISABLED", self, function()
         if UF.moveMode then
             UF.SetMoveMode(false)
         end
     end)
+    if UF.Skin then
+        UF.Skin.Enable()
+    end
+    if UF.Party then
+        UF.Party.Enable()
+    end
     UF.ApplyAll()
 end
 
