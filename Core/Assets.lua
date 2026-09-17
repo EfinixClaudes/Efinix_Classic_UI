@@ -92,6 +92,24 @@ local entries = {
     -- Auras (BuffFrame.xml 1.12). Debuff overlay sheet is used by Blizzard_RaidUI and CompactArenaFrame.
     ["Auras.DebuffOverlay"] = { path = B .. "UI-Debuff-Overlays", verified = true },
 
+    -- Chat (FloatingChatFrame.xml / ChatFrame.xml 1.12). Tab sheet is used by Blizzard_BattlefieldMap,
+    -- ScrollDown by UIDropDownMenuTemplates, the input borders by CharacterSelect / AccountSaveUI.
+    ["Chat.Tab"] = { path = "Interface\\ChatFrame\\ChatFrameTab", verified = true },
+    ["Chat.TabHighlight"] = { path = "Interface\\PaperDollInfoFrame\\UI-Character-Tab-Highlight" },
+    ["Chat.Border"] = { path = "Interface\\ChatFrame\\ChatFrameBorder" },
+    ["Chat.InputLeft"] = { path = "Interface\\ChatFrame\\UI-ChatInputBorder-Left", verified = true },
+    ["Chat.InputRight"] = { path = "Interface\\ChatFrame\\UI-ChatInputBorder-Right", verified = true },
+    ["Chat.ScrollEndUp"] = { path = "Interface\\ChatFrame\\UI-ChatIcon-ScrollEnd-Up" },
+    ["Chat.ScrollEndDown"] = { path = "Interface\\ChatFrame\\UI-ChatIcon-ScrollEnd-Down" },
+    ["Chat.ScrollEndDisabled"] = { path = "Interface\\ChatFrame\\UI-ChatIcon-ScrollEnd-Disabled" },
+    ["Chat.ScrollDownUp"] = { path = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up", verified = true },
+    ["Chat.ScrollDownDown"] = { path = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Down", verified = true },
+    ["Chat.ScrollDownDisabled"] = { path = "Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Disabled", verified = true },
+    ["Chat.ScrollUpUp"] = { path = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Up" },
+    ["Chat.ScrollUpDown"] = { path = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Down" },
+    ["Chat.ScrollUpDisabled"] = { path = "Interface\\ChatFrame\\UI-ChatIcon-ScrollUp-Disabled" },
+    ["Chat.ScrollFlash"] = { path = "Interface\\ChatFrame\\UI-ChatIcon-BlinkHilight" },
+
     -- Classic panel chrome (UIPanelTemplates 1.12). Highlight is referenced by loaded code.
     ["Panel.CloseUp"] = { path = B .. "UI-Panel-MinimizeButton-Up" },
     ["Panel.CloseDown"] = { path = B .. "UI-Panel-MinimizeButton-Down" },
