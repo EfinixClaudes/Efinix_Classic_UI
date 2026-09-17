@@ -194,6 +194,10 @@ function AB.Position()
     if AB.BagBar then
         AB.BagBar.Position()
     end
+    -- The cast bar sits above the bars we just moved (1.12 UIParent_ManageFramePositions).
+    if ns.CastBar then
+        ns.CastBar.Position()
+    end
 
     positioning = false
 end

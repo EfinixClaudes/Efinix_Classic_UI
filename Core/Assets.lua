@@ -67,6 +67,12 @@ local entries = {
     ["Bags.KeyRingHighlight"] = { path = B .. "UI-Button-KeyRing-Highlight", verified = true },
     ["Bags.KeyRingDown"] = { path = B .. "UI-Button-KeyRing-Down", verified = true },
 
+    -- Cast bar (CastingBarFrame.xml 1.12). Border is set by CastingBarMixin:SetLook,
+    -- Spark by Blizzard_NamePlateCastingBar, so both ship.
+    ["CastBar.Border"] = { path = "Interface\\CastingBar\\UI-CastingBar-Border", verified = true },
+    ["CastBar.Spark"] = { path = "Interface\\CastingBar\\UI-CastingBar-Spark", verified = true },
+    ["CastBar.Flash"] = { path = "Interface\\CastingBar\\UI-CastingBar-Flash" },
+
     -- Classic panel chrome (UIPanelTemplates 1.12). Highlight is referenced by loaded code.
     ["Panel.CloseUp"] = { path = B .. "UI-Panel-MinimizeButton-Up" },
     ["Panel.CloseDown"] = { path = B .. "UI-Panel-MinimizeButton-Down" },

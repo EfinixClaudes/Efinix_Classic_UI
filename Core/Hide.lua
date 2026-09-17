@@ -37,6 +37,14 @@ function ns.Hide(frame, keepEvents)
             Raw.Hide(self)
         end
     end)
+    -- SetShown(true) bypasses the Show hook; OnShow catches it.
+    if frame.HookScript then
+        frame:HookScript("OnShow", function(self)
+            if hidden[self] and not InCombatLockdown() then
+                Raw.Hide(self)
+            end
+        end)
+    end
 end
 
 function ns.IsHidden(frame)
@@ -59,4 +67,11 @@ function ns.Suppress(frame)
             Raw.Hide(self)
         end
     end)
+    if frame.HookScript then
+        frame:HookScript("OnShow", function(self)
+            if hidden[self] and not InCombatLockdown() then
+                Raw.Hide(self)
+            end
+        end)
+    end
 end
