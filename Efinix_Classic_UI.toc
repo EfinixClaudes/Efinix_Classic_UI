@@ -4,7 +4,7 @@
 ## Author: Sebi
 ## Version: @project-version@
 ## SavedVariables: EfinixClassicUIAccountSettings
-## SavedVariablesPerCharacter: EfinixClassicUICharSettings, EfinixClassicUIProbeS, EfinixClassicUIProbeB, EfinixClassicUIProbeN, EfinixClassicUIProbeT
+## SavedVariablesPerCharacter: EfinixClassicUICharSettings
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## X-Website: https://github.com/EfinixClaudes/Efinix_Classic_UI
 ## X-License: MIT

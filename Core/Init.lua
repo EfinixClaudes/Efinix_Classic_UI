@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-18.29" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-18.30" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -198,31 +198,10 @@ end
 ---------------------------------------------------------------------------
 -- Startup
 ---------------------------------------------------------------------------
--- Typed probes (per character): which value types come back on this client.
-local PROBES = {
-    { name = "EfinixClassicUIProbeS", label = "strings", value = { a = "x" } },
-    { name = "EfinixClassicUIProbeB", label = "booleans", value = { a = true, b = false } },
-    { name = "EfinixClassicUIProbeN", label = "numbers", value = { a = 1, b = 2.5 } },
-    { name = "EfinixClassicUIProbeT", label = "nested", value = { a = { b = "y" } } },
-}
-local function readProbes()
-    local parts = {}
-    for _, probe in ipairs(PROBES) do
-        parts[#parts + 1] = probe.label .. "=" .. (type(_G[probe.name]) == "table" and "ok" or "-")
-    end
-    ns.probeReport = table.concat(parts, " ")
-end
-local function writeProbes()
-    for _, probe in ipairs(PROBES) do
-        _G[probe.name] = probe.value
-    end
-end
-
 ns.RegisterEvent("ADDON_LOADED", ns, function(_, _, loaded)
     if loaded ~= ADDON then
         return
     end
-    readProbes()
     ns.DB.Adopt("ADDON_LOADED")
     if not ns.db then
         ns.DB.Load()
@@ -251,7 +230,6 @@ ns.RegisterEvent("PLAYER_LOGIN", ns, function()
             ns.Print("saved settings arrived late, /reload once to apply them")
         end
         ns.DB.Flush()
-        writeProbes()
     end)
     ns.RegisterEvent("PLAYER_LOGOUT", ns, function()
         ns.DB.Flush()
@@ -271,7 +249,6 @@ ns.RegisterEvent("PLAYER_LOGIN", ns, function()
             off[#off + 1] = name .. " (" .. ns.modules[name].state .. ")"
         end
     end
-    ns.Print("saved value types that load on this client: %s", tostring(ns.probeReport))
     ns.Print(
         "build %s loaded, settings from %s; parts off: %s; dark mode %s",
         ns.BUILD,

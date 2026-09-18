@@ -119,9 +119,9 @@ through the "Blizzard bank" button in the bank window.
 SETTINGS
 --------
 
-Settings are saved per character. The Forever beta client writes account-wide
-addon settings but does not read them back, so the addon uses the per-character
-store, which works. Set up the options once on each character.
+Settings are saved per character, with an account-wide copy that a new character
+starts from. The Forever beta client only reads addon settings back when the saved
+file contains nothing but text, so the addon stores everything as one text line.
 
 
 PROBLEMS

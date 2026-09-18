@@ -77,15 +77,16 @@ local migrations = {
     end,
 }
 
--- Forever (build 69913) writes SavedVariables but does not load our
--- settings table back, account-wide or per character, while a small
--- per-character table holding only strings did come back (probed in game
--- 2026-09-18). So the settings are stored as ONE STRING inside a
--- per-character variable: { data = "<encoded>" }. Encode/Decode below is a
--- flat "path=value" format for plain tables (string/number keys,
--- string/number/boolean values), no Lua parsing needed. ns.db is always a
--- private table; the global only ever holds the encoded copy, refreshed by
--- DB.Flush after every settings change and at logout.
+-- Forever (build 69913) writes SavedVariables files but loads a file back
+-- only when every value in it is a string: any boolean, number or nested
+-- table anywhere in the file makes the whole file come back empty (nine
+-- probe builds on 2026-09-18, see docs/CLIENT_FACTS.md). So the settings are
+-- stored as ONE STRING: { data = "<encoded>", build, written }, nothing else
+-- may ever be put into the saved globals. Encode/Decode below is a flat
+-- "path=value" format for plain tables (string/number keys, string/number/
+-- boolean values), no Lua parsing needed. ns.db is always a private table;
+-- the globals only hold the encoded copy, refreshed by DB.Flush after every
+-- settings change and at logout.
 -- DB.seen records what each event found, for /fcui status.
 DB.seen = {} -- event -> "file" | "none" | "legacy"
 
@@ -197,11 +198,10 @@ function DB.Decode(text)
     return root
 end
 
--- The per-character store only came back on this client while the addon
--- also declared an account-wide SavedVariables entry (build .25 loaded, .26
--- to .28 without the entry loaded nothing), so both are declared and both
--- receive the encoded copy; whichever is present at login is used, the
--- per-character one first.
+-- Both an account-wide and a per-character store receive the encoded copy;
+-- whichever is present at login is used, the per-character one first, so a
+-- character keeps its own settings and a new character starts from the
+-- account copy.
 local function savedTable()
     local char = EfinixClassicUICharSettings
     if type(char) == "table" and (type(char.data) == "string" or type(char.modules) == "table") then
