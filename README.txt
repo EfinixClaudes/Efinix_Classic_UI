@@ -46,7 +46,9 @@ COMMANDS  (type them in the chat box)
 /fcui bags shiftsell off    turns the hold-Shift auto sell and repair off (on = back on)
 /fcui scale 1.1             makes the whole bottom bar bigger or smaller (0.5-2.0)
 /fcui dark on               dark mode: all frame art (bars, unit frames, minimap,
-                            chat, tooltips, windows) tinted dark grey; "off" undoes it.
+                            chat, tooltips, windows) and the game's own windows (quest,
+                            gossip, vendor, character, mail, trainer, ...) tinted dark
+                            grey, black text on parchment turned light; "off" undoes it.
                             Also a checkbox in the options window.
 /fcui disable Bags          turns a part off. Parts: ActionBars, UnitFrames, CastBar,
                             SwingTimer, Minimap, Auras, Chat, Tooltip, Nameplates,
