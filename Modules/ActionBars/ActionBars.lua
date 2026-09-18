@@ -353,6 +353,14 @@ function AB:Enable()
     AB.MicroMenu.Enable()
     AB.BagBar.Enable()
 
+    -- Forever's extra bars 5-7 did not exist in 1.12; a bar with a single action
+    -- shows that one button floating above the multibars. Neutralised out of combat.
+    for _, name in ipairs({ "MultiBar5", "MultiBar6", "MultiBar7" }) do
+        if _G[name] then
+            ns.Hide(_G[name])
+        end
+    end
+
     ns.RegisterEvent("UPDATE_SHAPESHIFT_FORMS", self, AB.Position)
     ns.RegisterEvent("UPDATE_SHAPESHIFT_FORM", self, AB.Position)
     ns.RegisterEvent("PET_BAR_UPDATE", self, AB.Position)

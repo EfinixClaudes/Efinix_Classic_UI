@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-18.1" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-18.2" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -290,6 +290,21 @@ SlashCmdList.FCUI = function(input)
         status()
     elseif cmd == "diag" then
         diag(rest)
+    elseif cmd == "missing" then
+        -- only the old art files this client does not ship, short enough for one screenshot
+        local count = 0
+        for _, name in ipairs(ns.Assets.Missing()) do
+            ns.Print("missing: %s", ns.Assets.Path(name))
+            count = count + 1
+        end
+        for _, line in ipairs(ns.log) do
+            local path = line:match("missing texture (.+)$")
+            if path then
+                ns.Print("missing: %s", path)
+                count = count + 1
+            end
+        end
+        ns.Print("%d old texture files are not in this client", count)
     elseif cmd == "enable" or cmd == "disable" then
         local module = ns.modules[rest]
         if not module then
@@ -340,7 +355,7 @@ SlashCmdList.FCUI = function(input)
         ns.DB.Reset()
         ns.Print("settings reset, /reload to apply")
     else
-        ns.Print("commands: status, diag [module], enable <module>, disable <module>, scale <n>")
+        ns.Print("commands: status, missing, diag [module], enable <module>, disable <module>, scale <n>")
         ns.Print("          move [reset], bags columns <n>, bags bankcolumns <n>, reset")
     end
 end

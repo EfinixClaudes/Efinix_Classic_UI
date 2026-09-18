@@ -32,6 +32,7 @@ COMMANDS  (type them in the chat box)
 
 /fcui                       shows the command list
 /fcui status                shows what is running and which old textures are missing
+/fcui missing               lists only the old texture files your client does not have
 /fcui move                  shows green boxes on the player, target, focus and pet
                             frames; drag them where you want, then type /fcui move
                             again to lock them

@@ -44,6 +44,16 @@ local function entryFor(name)
     return nil
 end
 
+-- A frame the player dragged in Edit Mode is not in its Edit Mode default
+-- position; we leave those alone, exactly like a user-placed frame in 1.12.
+local function inEditModeDefault(frame)
+    if type(frame.IsInDefaultPosition) ~= "function" then
+        return true
+    end
+    local ok, result = pcall(frame.IsInDefaultPosition, frame)
+    return ok and result ~= false
+end
+
 -- Apply the saved position, or the 1.12 default, to the Blizzard frame. Out of combat only.
 -- Saved positions are the frame centre's offset from the UIParent centre, in UIParent
 -- units; SetPoint offsets are in the frame's own scale, so divide by it.
@@ -62,7 +72,7 @@ function UF.ApplyPosition(name)
             end
             Raw.ClearAllPoints(frame)
             Raw.SetPoint(frame, "CENTER", UIParent, "CENTER", pos.x / scale, pos.y / scale)
-        elseif entry and entry.default then
+        elseif entry and entry.default and inEditModeDefault(frame) then
             local default = entry.default
             local relativeTo = default.relativeTo and _G[default.relativeTo] or UIParent
             Raw.ClearAllPoints(frame)
