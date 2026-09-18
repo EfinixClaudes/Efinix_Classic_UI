@@ -305,14 +305,29 @@ local function playerStatus()
     hide(contextual.PlayerPortraitCornerIcon)
 end
 
+-- Returns the 1.12 icon for the unit's PvP state, or false when the state is
+-- a secret value on this client (other units' flags may be): then Blizzard's
+-- own icon, which takes secrets, is left in charge.
+local function isSecret(value)
+    return issecretvalue ~= nil and issecretvalue(value)
+end
+
 local function pvpTexture(unit)
-    if UnitIsPVPFreeForAll(unit) then
+    local ffa = UnitIsPVPFreeForAll(unit)
+    if isSecret(ffa) then
+        return false
+    end
+    if ffa then
         return file("pvpFFA")
     end
+    local pvp = UnitIsPVP(unit)
+    if isSecret(pvp) then
+        return false
+    end
     local faction = UnitFactionGroup(unit)
-    if faction == "Alliance" and UnitIsPVP(unit) then
+    if faction == "Alliance" and pvp then
         return file("pvpAlliance")
-    elseif faction == "Horde" and UnitIsPVP(unit) then
+    elseif faction == "Horde" and pvp then
         return file("pvpHorde")
     end
     return nil
@@ -490,13 +505,18 @@ end
 
 local function targetPvp(frame)
     local contextual = frame.TargetFrameContent.TargetFrameContentContextual
-    hide(contextual.PvpBackgroundCircle)
-    hide(contextual.PvpBackgroundIcon)
     local icon = Skin.targetPvpIcon and Skin.targetPvpIcon[frame]
     if not icon then
         return
     end
     local tex = frame.unit and UnitExists(frame.unit) and pvpTexture(frame.unit) or nil
+    if tex == false then
+        -- secret PvP state: Blizzard's icon stays, ours hides
+        icon:Hide()
+        return
+    end
+    hide(contextual.PvpBackgroundCircle)
+    hide(contextual.PvpBackgroundIcon)
     if tex then
         icon:SetTexture(tex)
         icon:Show()

@@ -90,14 +90,16 @@ local migrations = {
 -- DB.seen records what each event found, for /fcui status.
 DB.seen = {} -- event -> "file" | "none" | "legacy"
 
+-- "~XX" escapes: no "%" in the saved text (a percent sign is the one
+-- character we have not seen come back from this client's loader)
 local function escape(text)
     return (tostring(text):gsub("[^%w]", function(c)
-        return ("%%%02X"):format(c:byte())
+        return ("~%02X"):format(c:byte())
     end))
 end
 
 local function unescape(text)
-    return (text:gsub("%%(%x%x)", function(hex)
+    return (text:gsub("~(%x%x)", function(hex)
         return string.char(tonumber(hex, 16))
     end))
 end
@@ -137,7 +139,9 @@ local function decodeValue(text)
     return unescape(body)
 end
 
-local function encodeInto(out, tbl, prefix, depth)
+-- Only what differs from DEFAULTS is written (copyDefaults fills the rest at
+-- load), which keeps the saved text short.
+local function encodeInto(out, tbl, defaults, prefix, depth)
     if depth > 8 then
         return
     end
@@ -145,14 +149,19 @@ local function encodeInto(out, tbl, prefix, depth)
         local keyKind, valueKind = type(key), type(value)
         if keyKind == "string" or keyKind == "number" then
             local path = prefix .. encodeKey(key)
+            local default = type(defaults) == "table" and defaults[key] or nil
             if valueKind == "table" then
                 if next(value) == nil then
-                    out[#out + 1] = path .. "=t" -- empty table
+                    if type(default) == "table" and next(default) ~= nil then
+                        out[#out + 1] = path .. "=t" -- emptied on purpose
+                    end
                 else
-                    encodeInto(out, value, path .. ".", depth + 1)
+                    encodeInto(out, value, default, path .. ".", depth + 1)
                 end
             elseif valueKind == "string" or valueKind == "number" or valueKind == "boolean" then
-                out[#out + 1] = path .. "=" .. encodeValue(value)
+                if value ~= default then
+                    out[#out + 1] = path .. "=" .. encodeValue(value)
+                end
             end
         end
     end
@@ -160,7 +169,9 @@ end
 
 function DB.Encode(tbl)
     local out = {}
-    encodeInto(out, tbl, "", 0)
+    encodeInto(out, tbl, DEFAULTS, "", 0)
+    -- the schema version is always written, or the migrations would run again on load
+    out[#out + 1] = "sversion=n" .. tostring(tonumber(tbl.version) or DEFAULTS.version)
     table.sort(out)
     return table.concat(out, ";")
 end
@@ -198,11 +209,36 @@ function DB.Decode(text)
     return root
 end
 
--- Both an account-wide and a per-character store receive the encoded copy;
--- whichever is present at login is used, the per-character one first, so a
--- character keeps its own settings and a new character starts from the
--- account copy.
+-- Three stores receive the encoded text: a registered cvar (came back in
+-- every probe on this client, account-wide), the per-character and the
+-- account-wide saved variable (the saved files come back only sometimes).
+-- At login the cvar wins, then the per-character copy, then the account copy.
+local CVAR = "EfinixClassicUISettings"
+
+function DB.RegisterCVar()
+    if C_CVar and C_CVar.RegisterCVar and C_CVar.GetCVar and C_CVar.GetCVar(CVAR) == nil then
+        pcall(C_CVar.RegisterCVar, CVAR, "")
+    end
+end
+
+local function cvarTable()
+    local value = C_CVar and C_CVar.GetCVar and C_CVar.GetCVar(CVAR)
+    if type(value) ~= "string" or value == "" then
+        return nil
+    end
+    -- "HH:MM:SS|build|data"
+    local written, build, data = value:match("^([^|]*)|([^|]*)|(.*)$")
+    if not data then
+        return nil
+    end
+    return { data = data, written = written, build = build }
+end
+
 local function savedTable()
+    local cvar = cvarTable()
+    if cvar then
+        return cvar, "cvar"
+    end
     local char = EfinixClassicUICharSettings
     if type(char) == "table" and (type(char.data) == "string" or type(char.modules) == "table") then
         return char, "character"
@@ -241,6 +277,10 @@ function DB.Flush()
     local stamp = { data = data, build = tostring(ns.BUILD), written = date("%H:%M:%S") }
     EfinixClassicUICharSettings = stamp
     EfinixClassicUIAccountSettings = { data = data, build = stamp.build, written = stamp.written }
+    if C_CVar and C_CVar.SetCVar then
+        DB.RegisterCVar()
+        pcall(C_CVar.SetCVar, CVAR, stamp.written .. "|" .. stamp.build .. "|" .. data)
+    end
     DB.flushed = #data
 end
 
@@ -288,6 +328,9 @@ end
 function DB.Reset()
     EfinixClassicUICharSettings = nil
     EfinixClassicUIAccountSettings = nil
+    if C_CVar and C_CVar.SetCVar and C_CVar.GetCVar and C_CVar.GetCVar(CVAR) ~= nil then
+        pcall(C_CVar.SetCVar, CVAR, "")
+    end
     DB.loadedFromFile = false
     DB.Load()
     DB.Flush()
