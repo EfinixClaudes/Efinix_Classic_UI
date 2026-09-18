@@ -10,6 +10,7 @@ local DEFAULTS = {
         ActionBars = true,
         UnitFrames = true,
         CastBar = true,
+        SwingTimer = true,
         Minimap = true,
         Auras = true,
         Chat = true,
@@ -20,6 +21,8 @@ local DEFAULTS = {
     },
     -- Nameplates: the player's nameplateStyle cvar before we switched it to Classic
     nameplates = { previousStyle = nil },
+    -- SwingTimer: the player's showSwingTimer cvar before we switched it on
+    swingTimer = { previous = nil },
     -- UnitFrames: player-chosen frame positions, name -> {point, x, y} on UIParent
     positions = {},
     bags = {

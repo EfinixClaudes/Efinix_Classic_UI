@@ -42,7 +42,8 @@ COMMANDS  (type them in the chat box)
 /fcui bags shiftsell off    turns the hold-Shift auto sell and repair off (on = back on)
 /fcui scale 1.1             makes the whole bottom bar bigger or smaller (0.5-2.0)
 /fcui disable Bags          turns a part off. Parts: ActionBars, UnitFrames, CastBar,
-                            Minimap, Auras, Chat, Tooltip, Nameplates, RaidFrames, Bags.
+                            SwingTimer, Minimap, Auras, Chat, Tooltip, Nameplates,
+                            RaidFrames, Bags.
 /fcui enable Bags           turns it on again. Both need /reload afterwards.
 /fcui reset                 forgets all settings, then /reload
 
@@ -56,6 +57,11 @@ The tracking icon left of the minimap still opens the tracking menu.
 Chat: the chat tabs only appear while your mouse is over the chat frame, as they
 did back then. If your text box sits at the top of the chat frame, set
 "Chat Style" to "Classic" in the Interface options.
+Swing timer: thin yellow bars above the cast bar show your main hand, off hand
+and ranged auto-attack timers, using the game's own swing timer dressed in the
+old cast bar look. Type /fcui disable SwingTimer if you do not want it; that also
+switches the game's swing timer setting back to what it was. Edit Mode lets you
+choose whether the bars show always or only in combat.
 Nameplates: the addon switches the game's nameplate style to its hidden "Classic"
 look. Turning the Nameplates part off (or removing the addon after
 /fcui disable Nameplates) puts your old style back.

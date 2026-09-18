@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-17.11" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-17.12" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -297,7 +297,13 @@ SlashCmdList.FCUI = function(input)
             return
         end
         ns.db.modules[rest] = (cmd == "enable")
-        ns.Print("%s %sd, /reload to apply", rest, cmd)
+        -- run the lifecycle now so modules that changed a game setting can put it back
+        if cmd == "disable" then
+            ns.DisableModule(rest)
+        else
+            ns.EnableModule(rest)
+        end
+        ns.Print("%s %sd, /reload to apply fully", rest, cmd)
     elseif cmd == "scale" then
         local value = tonumber(rest)
         if value and value >= 0.5 and value <= 2 then

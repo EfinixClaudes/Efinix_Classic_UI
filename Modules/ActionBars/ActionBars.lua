@@ -198,6 +198,9 @@ function AB.Position()
     if ns.CastBar then
         ns.CastBar.Position()
     end
+    if ns.SwingTimer then
+        ns.SwingTimer.Position()
+    end
 
     positioning = false
 end

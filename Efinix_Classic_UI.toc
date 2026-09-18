@@ -28,6 +28,7 @@ Modules\UnitFrames\Skin.lua
 Modules\UnitFrames\Party.lua
 
 Modules\CastBar\CastBar.lua
+Modules\SwingTimer\SwingTimer.lua
 
 Modules\Minimap\Minimap.lua
 
