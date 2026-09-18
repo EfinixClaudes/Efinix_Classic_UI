@@ -94,7 +94,8 @@ Edit Mode still works for things the addon does not manage. The addon puts the
 player, target, focus, pet, cast bar, swing timer, chat and tooltip frames in
 their 2006 places, but as soon as you drag one of them in Edit Mode and save,
 it stays where you put it. "Reset to default" in Edit Mode brings the 2006
-position back.
+position back. The Edit Mode option to show an action bar only in combat (or
+only out of combat) is not supported; 2006 had no such thing.
 
 
 BAGS

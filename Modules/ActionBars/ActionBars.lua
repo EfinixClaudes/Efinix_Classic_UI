@@ -399,9 +399,33 @@ function AB:Init()
     AB.CreatePetArt()
 end
 
+-- EditModeActionBar_OnLoad registers PLAYER_REGEN_ENABLED/DISABLED on every
+-- action bar for the Edit Mode "show in combat / out of combat" visibility
+-- option; the handler ends in UpdateActionBarLayout, which re-stacks all
+-- bottom bars in their Edit Mode default position at every combat start
+-- and end. Those bars count as protected, so the 1.12 layout could not be
+-- put back until the fight ended. 1.12 had no combat visibility option, so
+-- the two events are taken off the bars while the module runs.
+local COMBAT_EVENTS = { "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED" }
+local function setCombatRestack(enabled)
+    for _, name in ipairs(BAR_NAMES) do
+        local bar = _G[name]
+        if bar and bar.UnregisterEvent then
+            for _, event in ipairs(COMBAT_EVENTS) do
+                if enabled then
+                    bar:RegisterEvent(event)
+                else
+                    bar:UnregisterEvent(event)
+                end
+            end
+        end
+    end
+end
+
 function AB:Enable()
     local frame = AB.frame
     frame:Show()
+    setCombatRestack(false)
 
     -- Buttons: reskin and lay out containers for every bar we own.
     for _, bar in ipairs(self.bars) do
@@ -441,6 +465,7 @@ end
 function AB:Disable()
     -- Reskins cannot be fully undone without a reload; hide our art and stop reacting.
     ns.UnregisterAllEvents(self)
+    setCombatRestack(true)
     if AB.frame then
         AB.frame:Hide()
     end

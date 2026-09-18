@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-18.20" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-18.21" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -272,9 +272,20 @@ local function status()
     end
 end
 
+-- module lookup for the slash command, which lowercases its input
+local function findModule(name)
+    name = (name or ""):lower()
+    for _, key in ipairs(ns.moduleOrder) do
+        if key:lower() == name then
+            return ns.modules[key], key
+        end
+    end
+end
+
 local function diag(name)
     if name and name ~= "" then
-        local module = ns.modules[name]
+        local module
+        module, name = findModule(name)
         if not module then
             ns.Print("no module named %s", name)
             return
@@ -320,11 +331,12 @@ SlashCmdList.FCUI = function(input)
         end
         ns.Print("%d old texture files are not in this client", count)
     elseif cmd == "enable" or cmd == "disable" then
-        local module = ns.modules[rest]
+        local module, key = findModule(rest)
         if not module then
-            ns.Print("no module named %s", rest)
+            ns.Print("no module named %s (parts: %s)", rest, table.concat(ns.moduleOrder, ", "))
             return
         end
+        rest = key
         ns.db.modules[rest] = (cmd == "enable")
         -- run the lifecycle now so modules that changed a game setting can put it back
         if cmd == "disable" then

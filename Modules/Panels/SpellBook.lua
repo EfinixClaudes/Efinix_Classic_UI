@@ -160,7 +160,7 @@ local function updateButton(button)
         button.Icon:Hide()
         button.Name:Hide()
         button.SubName:Hide()
-        button.Cooldown:Hide()
+        button.Cooldown:Clear()
         button.AutoCastable:Hide()
         button:SetChecked(false)
         button:GetNormalTexture():SetVertexColor(1, 1, 1)
@@ -201,25 +201,15 @@ local function updateButton(button)
     button.Name:Show()
     button.SubName:Show()
 
-    -- cooldown
-    local ok, cooldown = pcall(C_SpellBook.GetSpellBookItemCooldown, slot, bank)
-    if ok and type(cooldown) == "table" then
-        CooldownFrame_Set(
-            button.Cooldown,
-            cooldown.startTime,
-            cooldown.duration,
-            cooldown.isEnabled,
-            false,
-            cooldown.modRate
-        )
-        if cooldown.isEnabled then
-            button.Icon:SetVertexColor(1, 1, 1)
-        else
-            button.Icon:SetVertexColor(0.4, 0.4, 0.4)
-        end
+    -- cooldown: start, duration and rate are secret values on this client, so
+    -- they go straight into the widget (Blizzard_SpellBookItem does the same)
+    local okCd, cooldown = pcall(C_SpellBook.GetSpellBookItemCooldown, slot, bank)
+    if okCd and type(cooldown) == "table" then
+        button.Cooldown:SetCooldown(cooldown.startTime, cooldown.duration, cooldown.modRate)
     else
-        button.Cooldown:Hide()
+        button.Cooldown:Clear()
     end
+    button.Icon:SetVertexColor(1, 1, 1)
 
     -- pet autocast marker
     local allowed = false
