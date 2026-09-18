@@ -5,13 +5,13 @@ local _, ns = ...
 --   * from an icon next to the repair buttons in the vendor window
 --     (replaces Blizzard's MerchantSellAllJunkButton, which always asks a
 --     confirmation popup and can be disabled by a game rule),
---   * automatically when Shift is held for a moment while a vendor is open,
---     which also repairs all gear if the vendor can repair and you can pay.
+--   * automatically when Shift is held while a vendor window opens, or held
+--     for a second while it is open; that also repairs all gear if the
+--     vendor can repair and you can pay.
 --
 -- Selling uses the client's own C_MerchantFrame.SellAllJunkItems when the
 -- game allows it, otherwise each grey item is sold with
 -- C_Container.UseContainerItem, which is what a click on the item would do.
-local Raw = ns.Raw
 local Assets = ns.Assets
 local Bags = ns.Bags
 
@@ -22,7 +22,6 @@ Bags.Junk = Junk -- the bag window's coin icon uses Junk.CreateButton
 local Vendor = ns.RegisterModule("Vendor", {})
 ns.Vendor = Vendor
 
-local SHIFT_HOLD_SECONDS = 1.5
 local POOR = Enum and Enum.ItemQuality and Enum.ItemQuality.Poor or 0
 local NUM_BAGS = NUM_BAG_SLOTS or 4
 local REAGENT_BAG = Enum and Enum.BagIndex and Enum.BagIndex.ReagentBag or 5
@@ -41,6 +40,14 @@ local function apiAvailable()
         and C_MerchantFrame.IsSellAllJunkEnabled()
 end
 
+-- A value that may be a secret on this client is never compared; nil instead.
+local function plain(value)
+    if ns.Compat.IsSecret(value) then
+        return nil
+    end
+    return value
+end
+
 ---------------------------------------------------------------------------
 -- Junk scan
 ---------------------------------------------------------------------------
@@ -49,7 +56,7 @@ local function sellPriceOf(link)
         return 0
     end
     local price = select(11, C_Item.GetItemInfo(link))
-    return tonumber(price) or 0
+    return tonumber(plain(price)) or 0
 end
 
 -- Returns list of {bag, slot, count, value} and the total vendor value.
@@ -60,15 +67,16 @@ function Junk.Collect()
     for i = 1, NUM_BAGS do
         bags[#bags + 1] = i
     end
-    if C_Container.GetContainerNumSlots(REAGENT_BAG) > 0 then
+    if (C_Container.GetContainerNumSlots(REAGENT_BAG) or 0) > 0 then
         bags[#bags + 1] = REAGENT_BAG
     end
     for _, bag in ipairs(bags) do
-        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) or 0 do
             local info = C_Container.GetContainerItemInfo(bag, slot)
-            if info and info.quality == POOR and not info.hasNoValue then
-                local value = sellPriceOf(info.hyperlink) * (info.stackCount or 1)
-                items[#items + 1] = { bag = bag, slot = slot, count = info.stackCount or 1, value = value }
+            if info and plain(info.quality) == POOR and not plain(info.hasNoValue) then
+                local count = tonumber(plain(info.stackCount)) or 1
+                local value = sellPriceOf(plain(info.hyperlink)) * count
+                items[#items + 1] = { bag = bag, slot = slot, count = count, value = value }
                 total = total + value
             end
         end
@@ -77,9 +85,6 @@ function Junk.Collect()
 end
 
 function Junk.Count()
-    if apiAvailable() and C_MerchantFrame.GetNumJunkItems then
-        return C_MerchantFrame.GetNumJunkItems()
-    end
     local items = Junk.Collect()
     return #items
 end
@@ -96,15 +101,20 @@ local function coins(amount)
     return tostring(amount) .. "c"
 end
 
-function Junk.Sell()
+-- Returns the number of items sold and their value, or nil and a reason.
+function Junk.Sell(quiet)
     if not merchantOpen() then
-        ns.Print("open a vendor first")
-        return false
+        if not quiet then
+            ns.Print("open a vendor first")
+        end
+        return nil, "no vendor open"
     end
     local items, total = Junk.Collect()
     if #items == 0 then
-        ns.Print("no junk to sell")
-        return false
+        if not quiet then
+            ns.Print("no junk to sell")
+        end
+        return nil, "no junk to sell"
     end
     if apiAvailable() then
         C_MerchantFrame.SellAllJunkItems()
@@ -113,31 +123,42 @@ function Junk.Sell()
             C_Container.UseContainerItem(item.bag, item.slot)
         end
     end
-    ns.Print("sold %d junk item%s for %s", #items, #items == 1 and "" or "s", coins(total))
+    if not quiet then
+        ns.Print("sold %d junk item%s for %s", #items, #items == 1 and "" or "s", coins(total))
+    end
     if SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON then
         PlaySound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
     end
-    return true
+    return #items, total
 end
 
 ---------------------------------------------------------------------------
 -- Repair (MerchantFrame.lua: GetRepairAllCost / RepairAllItems)
 ---------------------------------------------------------------------------
-function Junk.Repair()
-    if not merchantOpen() or not CanMerchantRepair or not CanMerchantRepair() then
-        return false
+-- Returns the cost paid, or nil and a reason.
+function Junk.Repair(quiet)
+    if not merchantOpen() then
+        return nil, "no vendor open"
+    end
+    if not CanMerchantRepair or not CanMerchantRepair() then
+        return nil, "this vendor cannot repair"
     end
     local cost, canRepair = GetRepairAllCost()
-    if not canRepair or not cost or cost <= 0 then
-        return false
+    cost = tonumber(plain(cost)) or 0
+    if not canRepair or cost <= 0 then
+        return nil, "nothing to repair"
     end
     if GetMoney() < cost then
-        ns.Print("not enough money to repair (%s)", coins(cost))
-        return false
+        if not quiet then
+            ns.Print("not enough money to repair (%s)", coins(cost))
+        end
+        return nil, "not enough money to repair (" .. coins(cost) .. ")"
     end
     RepairAllItems()
-    ns.Print("repaired all items for %s", coins(cost))
-    return true
+    if not quiet then
+        ns.Print("repaired all items for %s", coins(cost))
+    end
+    return cost
 end
 
 ---------------------------------------------------------------------------
@@ -222,33 +243,84 @@ local function createMerchantButton()
 end
 
 ---------------------------------------------------------------------------
--- Shift hold
+-- Shift: sell junk and repair
+-- Acts right away when Shift is already held as the vendor window opens,
+-- otherwise after Shift has been held for a second while it is open, and
+-- again after the key was released and held once more. A C_Timer ticker
+-- polls the key while the vendor is open; it is not tied to any frame, so
+-- nothing the game does to the merchant frame can stop it. Every run prints
+-- what it did, so a visit with nothing to sell or repair still answers.
 ---------------------------------------------------------------------------
-local watcher = CreateFrame("Frame")
-watcher:Hide()
-watcher.held = 0
-watcher.sold = false
-watcher:SetScript("OnUpdate", function(self, elapsed)
-    if not ns.db.bags.shiftSell or not merchantOpen() then
-        self.held = 0
-        self.sold = false
+local SHIFT_HOLD_SECONDS = 1
+local TICK = 0.2
+local shift = { ticker = nil, held = 0, done = false, last = "never" }
+Junk.shift = shift
+
+local function shiftAction(how)
+    shift.done = true
+    local parts = {}
+    local sold, soldValue = Junk.Sell(true)
+    if sold then
+        parts[#parts + 1] = ("sold %d junk item%s for %s"):format(sold, sold == 1 and "" or "s", coins(soldValue))
+    else
+        parts[#parts + 1] = soldValue
+    end
+    local cost, reason = Junk.Repair(true)
+    if cost then
+        parts[#parts + 1] = "repaired for " .. coins(cost)
+    else
+        parts[#parts + 1] = reason
+    end
+    local summary = table.concat(parts, ", ")
+    shift.last = ("%s (%s, %s)"):format(summary, how, date("%H:%M:%S"))
+    ns.Print("Shift at vendor: %s", summary)
+    refreshButtons()
+end
+
+local function shiftTick()
+    if not merchantOpen() then
+        Junk.StopShift()
+        return
+    end
+    if not ns.db.bags.shiftSell then
         return
     end
     if IsShiftKeyDown() then
-        self.held = self.held + elapsed
-        if not self.sold and self.held >= SHIFT_HOLD_SECONDS then
-            self.sold = true
-            if Junk.Count() > 0 then
-                Junk.Sell()
-                refreshButtons()
-            end
-            Junk.Repair()
+        shift.held = shift.held + TICK
+        if not shift.done and shift.held >= SHIFT_HOLD_SECONDS then
+            shiftAction("held")
         end
     else
-        self.held = 0
-        self.sold = false
+        shift.held = 0
+        shift.done = false
     end
-end)
+end
+
+function Junk.StartShift()
+    Junk.StopShift()
+    shift.done = false
+    if not ns.db.bags.shiftSell then
+        return
+    end
+    if IsShiftKeyDown() then
+        -- Shift held while talking to the vendor: a moment for the window
+        -- and the repair cost to be in place, then act.
+        C_Timer.After(0.2, function()
+            if merchantOpen() and not shift.done and IsShiftKeyDown() then
+                shiftAction("held while opening")
+            end
+        end)
+    end
+    shift.ticker = C_Timer.NewTicker(TICK, shiftTick)
+end
+
+function Junk.StopShift()
+    if shift.ticker then
+        shift.ticker:Cancel()
+        shift.ticker = nil
+    end
+    shift.held = 0
+end
 
 ---------------------------------------------------------------------------
 -- Enable
@@ -256,23 +328,30 @@ end)
 function Junk.Enable()
     createMerchantButton()
     ns.RegisterEvent("MERCHANT_SHOW", Junk, function()
-        watcher.held = 0
-        watcher.sold = false
-        Raw.Show(watcher)
+        Junk.StartShift()
         refreshButtons()
     end)
     ns.RegisterEvent("MERCHANT_CLOSED", Junk, function()
-        Raw.Hide(watcher)
+        Junk.StopShift()
         refreshButtons()
     end)
     ns.RegisterEvent("MERCHANT_UPDATE", Junk, refreshButtons)
     ns.RegisterEvent("BAG_UPDATE_DELAYED", Junk, refreshButtons)
     refreshButtons()
+    if merchantOpen() then
+        Junk.StartShift()
+    end
 end
 
 function Junk.SetShiftSell(enabled)
     ns.db.bags.shiftSell = enabled
+    ns.DB.Flush()
     ns.Print("hold Shift at a vendor to sell junk and repair: %s", enabled and "on" or "off")
+    if enabled and merchantOpen() then
+        Junk.StartShift()
+    elseif not enabled then
+        Junk.StopShift()
+    end
 end
 
 function Vendor:Init() end
@@ -283,7 +362,7 @@ end
 
 function Vendor:Disable()
     ns.UnregisterAllEvents(Junk)
-    Raw.Hide(watcher)
+    Junk.StopShift()
     if Junk.merchantButton then
         Junk.merchantButton:Hide()
     end
@@ -293,11 +372,21 @@ end
 function Vendor:Refresh() end
 
 function Vendor:Diag()
+    local canRepair = CanMerchantRepair and merchantOpen() and CanMerchantRepair() or false
+    local cost = 0
+    if canRepair then
+        cost = tonumber(plain((GetRepairAllCost()))) or 0
+    end
     ns.Print(
-        "  shiftSell=%s merchantOpen=%s watcher shown=%s junk=%d",
+        "  shiftSell=%s merchantOpen=%s ticker=%s held=%.1fs done=%s junk=%d canRepair=%s cost=%s",
         tostring(ns.db.bags.shiftSell),
         tostring(merchantOpen()),
-        tostring(Raw.IsShown(watcher)),
-        Junk.Count()
+        tostring(shift.ticker ~= nil),
+        shift.held,
+        tostring(shift.done),
+        Junk.Count(),
+        tostring(canRepair),
+        coins(cost)
     )
+    ns.Print("  last shift run: %s", shift.last)
 end

@@ -43,6 +43,8 @@ COMMANDS  (type them in the chat box)
 /fcui bags columns 12       how many item slots per row in the bag window (4-20)
 /fcui bags bankcolumns 14   same for the bank window (4-24)
 /fcui bags selljunk         sells all grey items (only at a vendor)
+/fcui bags bank             opens the bank window anywhere, showing what was in your
+                            bank the last time you visited one
 /fcui bags shiftsell off    turns the hold-Shift auto sell and repair off (on = back on)
 /fcui scale 1.1             makes the whole bottom bar bigger or smaller (0.5-2.0)
 /fcui dark on               dark mode: all frame art (bars, unit frames, minimap,
@@ -108,12 +110,19 @@ belong to that bag. The keyring only shows the rows that hold keys.
 Type in the search box to dim everything that does not match.
 "Sort" tidies the bags. Drag the window by its border to move it.
 The coin icon next to "Sort" sells all grey junk while a vendor is open; the same
-icon sits next to the repair buttons in the vendor window. Holding Shift for about
-one second at a vendor sells all junk and repairs all your gear automatically.
+icon sits next to the repair buttons in the vendor window. Hold Shift while you
+talk to a vendor, or hold it for a second while the vendor window is open, and
+the addon sells all junk and repairs all your gear, then tells you in chat what
+it did (or why there was nothing to do). Release and hold again to repeat.
 These vendor features are their own part ("Vendor" in the options), so they keep
 working when the bag window is turned off.
 At a banker the bank window opens next to it. Buying new bank tabs is done
 through the "Blizzard bank" button in the bank window.
+The addon remembers your bank: the "Bank" button in the bag window (or
+/fcui bags bank) opens the bank window anywhere and shows what was in it at your
+last visit, with the date in the title. You can read tooltips and Shift-click
+items into chat, but not move them. Escape closes the window. The snapshot is
+taken every time you open the bank, so it is always as fresh as your last visit.
 
 
 SETTINGS
@@ -121,7 +130,9 @@ SETTINGS
 
 Settings are saved per character, with an account-wide copy that a new character
 starts from. The Forever beta client only reads addon settings back when the saved
-file contains nothing but text, so the addon stores everything as one text line.
+file contains nothing but text, so the addon stores everything as one text line,
+and keeps that line in a game setting of its own as well, because the beta loads
+saved files back only some of the time. The bank snapshot is stored the same way.
 
 
 PROBLEMS

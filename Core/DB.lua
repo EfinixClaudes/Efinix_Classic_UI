@@ -103,6 +103,8 @@ local function unescape(text)
         return string.char(tonumber(hex, 16))
     end))
 end
+DB.Escape = escape
+DB.Unescape = unescape
 
 local function encodeKey(key)
     if type(key) == "number" then
@@ -250,6 +252,65 @@ local function savedTable()
     return nil
 end
 
+---------------------------------------------------------------------------
+-- Extra stores for bulkier data (the bank snapshot): one registered cvar
+-- "EfinixClassicUI<key>" each, plus a copy inside the per-character saved
+-- table under "blob_<key>". The cvar wins at load, as with the settings.
+---------------------------------------------------------------------------
+local blobs = {} -- key -> text | false (looked up, nothing stored)
+
+local function blobCVar(key)
+    return "EfinixClassicUI" .. key
+end
+
+local function registerBlobCVar(key)
+    if C_CVar and C_CVar.RegisterCVar and C_CVar.GetCVar and C_CVar.GetCVar(blobCVar(key)) == nil then
+        pcall(C_CVar.RegisterCVar, blobCVar(key), "")
+    end
+end
+
+function DB.GetBlob(key)
+    if blobs[key] == nil then
+        local value
+        if C_CVar and C_CVar.GetCVar then
+            registerBlobCVar(key)
+            value = C_CVar.GetCVar(blobCVar(key))
+        end
+        if type(value) ~= "string" or value == "" then
+            local char = EfinixClassicUICharSettings
+            value = type(char) == "table" and char["blob_" .. key] or nil
+        end
+        blobs[key] = type(value) == "string" and value ~= "" and value or false
+    end
+    return blobs[key] or nil
+end
+
+function DB.SetBlob(key, text)
+    blobs[key] = text
+    if C_CVar and C_CVar.SetCVar then
+        registerBlobCVar(key)
+        pcall(C_CVar.SetCVar, blobCVar(key), text)
+    end
+    DB.Flush()
+end
+
+-- Carry blob copies into a fresh saved table: what this session set, else
+-- what the previous table held.
+local function copyBlobs(previous, stamp)
+    if type(previous) == "table" then
+        for field, value in pairs(previous) do
+            if type(field) == "string" and field:sub(1, 5) == "blob_" and type(value) == "string" then
+                stamp[field] = value
+            end
+        end
+    end
+    for key, text in pairs(blobs) do
+        if text then
+            stamp["blob_" .. key] = text
+        end
+    end
+end
+
 -- Read the saved global if it holds settings we have not taken yet.
 function DB.Adopt(event)
     local saved = savedTable()
@@ -275,6 +336,7 @@ function DB.Flush()
     ns.db.logins = tonumber(ns.db.logins) or 0
     local data = DB.Encode(ns.db)
     local stamp = { data = data, build = tostring(ns.BUILD), written = date("%H:%M:%S") }
+    copyBlobs(EfinixClassicUICharSettings, stamp)
     EfinixClassicUICharSettings = stamp
     EfinixClassicUIAccountSettings = { data = data, build = stamp.build, written = stamp.written }
     if C_CVar and C_CVar.SetCVar then

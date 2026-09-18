@@ -5,7 +5,8 @@ local _, ns = ...
 -- background, 37 px Quickslot2 item buttons), with the Bagnon feature set
 -- that matters day to day: continuous item grid, per-bag toggles, search,
 -- sort, money, keyring, quality borders, quest markers, cooldowns, movable
--- and remembered position, configurable columns.
+-- and remembered position, configurable columns, and a bank window that
+-- shows the last visit's contents when no banker is near.
 --
 -- Item buttons are Blizzard's ContainerFrameItemButtonTemplate so clicks,
 -- drags, tooltips, splitting and vendor selling run Blizzard's own (secure)
@@ -51,6 +52,146 @@ local function inventoryBagIDs()
     return ids
 end
 
+---------------------------------------------------------------------------
+-- Bank snapshot
+-- Bank slots only answer while a banker is open, so every visit is written
+-- down (tabs, slot counts, item strings, counts, qualities, icons) and the
+-- bank window shows that copy anywhere else. Stored through ns.DB.SetBlob
+-- (a registered cvar, the store that comes back reliably on this client),
+-- one entry per character, joined by "&":
+--   <char>|<seen>|<tab>;<tab>...    tab = id,slots,name,icon,<slot>/<slot>...
+--   slot = n=itemstring,count,quality,icon
+-- Item strings hold only [%w:-]; names and the character key go through
+-- DB.Escape, so no separator can appear inside a field.
+---------------------------------------------------------------------------
+local BANK_BLOB = "Bank"
+local bankCache -- decoded snapshot for this character, or nil
+local bankOpen = false -- BANKFRAME_OPENED .. BANKFRAME_CLOSED
+
+local function bankLive()
+    return bankOpen or (BankFrame ~= nil and BankFrame:IsShown())
+end
+
+local function charKey()
+    return (UnitName("player") or "?") .. "-" .. (GetRealmName() or "?")
+end
+
+local function cachedTab(bagID)
+    if not bankCache then
+        return nil
+    end
+    for _, tab in ipairs(bankCache.tabs) do
+        if tab.id == bagID then
+            return tab
+        end
+    end
+    return nil
+end
+
+-- A value that may be a secret on this client is never compared; nil instead.
+local function plain(value)
+    if ns.Compat.IsSecret(value) then
+        return nil
+    end
+    return value
+end
+
+local function itemString(link)
+    if type(link) ~= "string" then
+        return nil
+    end
+    local body = link:match("item:[%w:%-]+")
+    if not body then
+        return nil
+    end
+    return (body:gsub(":+$", ""))
+end
+
+local function encodeSnapshot(cache)
+    local tabs = {}
+    for _, tab in ipairs(cache.tabs) do
+        local slots = {}
+        for slot, item in pairs(tab.slots) do
+            slots[#slots + 1] = ("%d=%s,%d,%d,%d"):format(
+                slot,
+                item.link,
+                item.count,
+                item.quality or -1,
+                item.icon or 0
+            )
+        end
+        table.sort(slots)
+        tabs[#tabs + 1] = ("%d,%d,%s,%d,%s"):format(
+            tab.id,
+            tab.numSlots,
+            ns.DB.Escape(tab.name or ""),
+            tab.icon or 0,
+            table.concat(slots, "/")
+        )
+    end
+    return ("%s|%d|%s"):format(ns.DB.Escape(charKey()), cache.seen or 0, table.concat(tabs, ";"))
+end
+
+local function decodeSnapshot(entry)
+    local seen, tabsText = entry:match("^[^|]*|([^|]*)|(.*)$")
+    if not seen then
+        return nil
+    end
+    local cache = { seen = tonumber(seen) or 0, tabs = {} }
+    for tabText in tabsText:gmatch("[^;]+") do
+        local id, numSlots, name, icon, slotsText = tabText:match("^(%-?%d+),(%d+),([^,]*),(%-?%d*),(.*)$")
+        if id then
+            local tab = {
+                id = tonumber(id),
+                numSlots = tonumber(numSlots) or 0,
+                name = ns.DB.Unescape(name),
+                icon = tonumber(icon),
+                slots = {},
+            }
+            for slotText in slotsText:gmatch("[^/]+") do
+                local slot, link, count, quality, iconID = slotText:match("^(%d+)=([^,]*),(%d+),(%-?%d+),(%d+)$")
+                if slot then
+                    tab.slots[tonumber(slot)] = {
+                        link = link,
+                        count = tonumber(count) or 1,
+                        quality = tonumber(quality),
+                        icon = tonumber(iconID),
+                    }
+                end
+            end
+            cache.tabs[#cache.tabs + 1] = tab
+        end
+    end
+    return cache
+end
+
+local function loadBankCache()
+    local blob = ns.DB.GetBlob(BANK_BLOB)
+    if type(blob) ~= "string" then
+        return
+    end
+    local mine = ns.DB.Escape(charKey()) .. "|"
+    for entry in blob:gmatch("[^&]+") do
+        if entry:sub(1, #mine) == mine then
+            bankCache = decodeSnapshot(entry)
+        end
+    end
+end
+
+local function saveBankCache()
+    local mine = ns.DB.Escape(charKey()) .. "|"
+    local entries = { encodeSnapshot(bankCache) }
+    local blob = ns.DB.GetBlob(BANK_BLOB)
+    if type(blob) == "string" then
+        for entry in blob:gmatch("[^&]+") do
+            if entry:sub(1, #mine) ~= mine then
+                entries[#entries + 1] = entry
+            end
+        end
+    end
+    ns.DB.SetBlob(BANK_BLOB, table.concat(entries, "&"))
+end
+
 local function bankBagIDs()
     local ids = {}
     if C_Bank and C_Bank.FetchPurchasedBankTabIDs and Enum.BankType then
@@ -75,12 +216,62 @@ local function bankTabName(bagID)
             end
         end
     end
+    local tab = cachedTab(bagID)
+    if tab then
+        return tab.name, tab.icon
+    end
     return nil
+end
+
+-- Every bank visit is written down; see "Bank snapshot" above. A read that
+-- finds no tabs at all (the session already gone) never replaces a snapshot.
+local function snapshotBank()
+    if not bankLive() then
+        return
+    end
+    local cache = { seen = time(), tabs = {} }
+    for _, id in ipairs(bankBagIDs()) do
+        local name, icon = bankTabName(id)
+        local numSlots = C_Container.GetContainerNumSlots(id) or 0
+        local tab = { id = id, numSlots = numSlots, name = name, icon = icon, slots = {} }
+        for slot = 1, numSlots do
+            local info = C_Container.GetContainerItemInfo(id, slot)
+            if info then
+                local itemID = tonumber(plain(info.itemID))
+                local link = itemString(plain(info.hyperlink)) or (itemID and ("item:" .. itemID))
+                if link then
+                    tab.slots[slot] = {
+                        link = link,
+                        count = tonumber(plain(info.stackCount)) or 1,
+                        quality = tonumber(plain(info.quality)),
+                        icon = tonumber(plain(info.iconFileID)),
+                    }
+                end
+            end
+        end
+        if numSlots > 0 then
+            cache.tabs[#cache.tabs + 1] = tab
+        end
+    end
+    if #cache.tabs == 0 and bankCache then
+        return
+    end
+    bankCache = cache
+    saveBankCache()
 end
 
 local function bagIDsFor(kind)
     if kind == "bank" then
-        return bankBagIDs()
+        if bankLive() then
+            return bankBagIDs()
+        end
+        local ids = {}
+        if bankCache then
+            for _, tab in ipairs(bankCache.tabs) do
+                ids[#ids + 1] = tab.id
+            end
+        end
+        return ids
     end
     return inventoryBagIDs()
 end
@@ -149,6 +340,7 @@ local function createPanelButton(parent, text, width)
     button:GetHighlightTexture():SetTexCoord(0, 0.625, 0, 0.6875)
     button:SetNormalFontObject(GameFontNormalSmall)
     button:SetHighlightFontObject(GameFontHighlightSmall)
+    button:SetDisabledFontObject(GameFontDisableSmall)
     button:SetText(text)
     return button
 end
@@ -287,6 +479,71 @@ local function updateItemButton(button, bagID, slot)
 end
 
 ---------------------------------------------------------------------------
+-- Offline bank slots: plain item buttons painted from the snapshot. They
+-- show tooltips and put links into chat; nothing can be moved.
+---------------------------------------------------------------------------
+local function getOfflineButton(window, index)
+    local button = window.offline[index]
+    if button then
+        return button
+    end
+    button = CreateFrame("ItemButton", ("FCUI_Bags_%s_offline_%d"):format(window.kind, index), window.Items)
+    button:SetSize(SLOT, SLOT)
+    styleItemButton(button)
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    button:SetScript("OnEnter", function(self)
+        if not self.link then
+            return
+        end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if not pcall(GameTooltip.SetHyperlink, GameTooltip, self.link) then
+            GameTooltip:SetText(self.link)
+        end
+        GameTooltip:Show()
+    end)
+    button:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    button:SetScript("OnClick", function(self)
+        if self.link and IsModifiedClick("CHATLINK") then
+            local _, fullLink = C_Item.GetItemInfo(self.link)
+            if fullLink then
+                ChatEdit_InsertLink(fullLink)
+            end
+        end
+    end)
+    window.offline[index] = button
+    return button
+end
+
+local function offlineName(link)
+    local name = C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(link)
+    return type(name) == "string" and name:lower() or nil
+end
+
+local function paintOfflineButton(button, item, search)
+    button.link = item and item.link or nil
+    local icon = item and item.icon ~= 0 and item.icon or nil
+    if item and not icon and C_Item and C_Item.GetItemIconByID then
+        icon = C_Item.GetItemIconByID(item.link)
+    end
+    SetItemButtonTexture(button, icon)
+    SetItemButtonCount(button, item and item.count or 0)
+    SetItemButtonDesaturated(button, false)
+    if item and item.quality and item.quality >= 0 then
+        SetItemButtonQuality(button, item.quality, item.link)
+    else
+        SetItemButtonQuality(button, nil)
+    end
+    local dim = false
+    if item and search ~= "" then
+        local name = offlineName(item.link)
+        dim = name ~= nil and not name:find(search, 1, true)
+    end
+    button:SetAlpha(dim and 0.25 or 1)
+end
+
+---------------------------------------------------------------------------
 -- Bag toggle row
 ---------------------------------------------------------------------------
 local function bagIcon(kind, bagID)
@@ -397,6 +654,7 @@ function Bags.RefreshWindow(kind, relayout)
     if not window or not window:IsShown() then
         return
     end
+    local offline = kind == "bank" and not bankLive()
     local bagIDs = bagIDsFor(kind)
     layoutToggles(window, bagIDs)
 
@@ -404,13 +662,31 @@ function Bags.RefreshWindow(kind, relayout)
     local stride = SLOT + SPACING
     local index = 0
     local seen = {}
+    local offlineUsed = 0
+    local search = offline and window.Search and window.Search:GetText():lower() or ""
     for _, bagID in ipairs(bagIDs) do
         seen[bagID] = true
-        local numSlots = numSlotsFor(bagID)
+        local tab = offline and cachedTab(bagID) or nil
+        local numSlots = offline and (tab and tab.numSlots or 0) or numSlotsFor(bagID)
         local holder = window.holders[bagID]
         if isBagHidden(kind, bagID) or numSlots == 0 then
             if holder then
                 holder:Hide()
+            end
+        elseif offline then
+            if holder then
+                holder:Hide()
+            end
+            for slot = 1, numSlots do
+                offlineUsed = offlineUsed + 1
+                local button = getOfflineButton(window, offlineUsed)
+                index = index + 1
+                local col = (index - 1) % columns
+                local row = math.floor((index - 1) / columns)
+                button:ClearAllPoints()
+                button:SetPoint("TOPLEFT", window.Items, "TOPLEFT", col * stride, -row * stride)
+                button:Show()
+                paintOfflineButton(button, tab.slots[slot], search)
             end
         else
             for slot = 1, numSlots do
@@ -435,6 +711,9 @@ function Bags.RefreshWindow(kind, relayout)
             holder:Hide()
         end
     end
+    for i = offlineUsed + 1, #window.offline do
+        window.offline[i]:Hide()
+    end
 
     local rows = math.max(1, math.ceil(index / columns))
     local width = PADDING * 2 + columns * stride - SPACING
@@ -442,9 +721,23 @@ function Bags.RefreshWindow(kind, relayout)
     window:SetSize(width, height)
     window.Items:SetSize(columns * stride - SPACING, rows * stride - SPACING)
     if index == 0 then
+        if offline then
+            window.Empty:SetText(bankCache and "No bank tabs" or "Not seen yet. Visit a banker once.")
+        else
+            window.Empty:SetText(kind == "bank" and "No bank tabs" or "No bags")
+        end
         window.Empty:Show()
     else
         window.Empty:Hide()
+    end
+    if kind == "bank" then
+        local title = BANK or "Bank"
+        if offline and bankCache then
+            title = ("%s (%s)"):format(title, date("%d.%m. %H:%M", bankCache.seen))
+        end
+        window.Title:SetText(title)
+        window.Sort:SetEnabled(not offline)
+        window.BlizzardBank:SetEnabled(not offline)
     end
     if relayout and window.Search then
         window.Search:ClearFocus()
@@ -537,6 +830,7 @@ local function createWindow(kind, title)
     window.kind = kind
     window.holders = {}
     window.toggles = {}
+    window.offline = {}
     window:SetFrameStrata("HIGH")
     window:SetToplevel(true)
     window:SetMovable(true)
@@ -562,6 +856,11 @@ local function createWindow(kind, title)
     window:SetScript("OnHide", function(self)
         if self.Search and self.Search:GetText() ~= "" then
             self.Search:SetText("")
+        end
+        -- Escape (UISpecialFrames) hides this window first; a bank session
+        -- the game still has open behind it ends with it.
+        if self.kind == "bank" and BankFrame and BankFrame:IsShown() and not InCombatLockdown() then
+            HideUIPanel(BankFrame)
         end
     end)
     window:Hide()
@@ -591,6 +890,9 @@ local function createWindow(kind, title)
     window.Search:SetScript("OnTextChanged", function(self)
         if C_Container.SetItemSearch then
             C_Container.SetItemSearch(self:GetText())
+        end
+        if kind == "bank" and not bankLive() then
+            Bags.RefreshWindow(kind)
         end
     end)
     window.Search:SetScript("OnEscapePressed", function(self)
@@ -628,6 +930,12 @@ local function createWindow(kind, title)
     if kind == "inventory" then
         window.Junk = Bags.Junk.CreateButton(window, TOGGLE)
         window.Junk:SetPoint("LEFT", window.Sort, "RIGHT", 8, 0)
+        -- the bank window anywhere (last visit's contents away from a banker)
+        window.Bank = createPanelButton(window, BANK or "Bank", 50)
+        window.Bank:SetPoint("LEFT", window.Junk, "RIGHT", 8, 0)
+        window.Bank:SetScript("OnClick", function()
+            Bags.ToggleBank()
+        end)
     end
 
     -- Money
@@ -676,6 +984,19 @@ function Bags.Close(kind)
     end
 end
 
+-- The bank window anywhere: live at a banker, the last snapshot elsewhere.
+function Bags.ToggleBank()
+    local window = Bags.windows.bank
+    if not window then
+        return
+    end
+    if window:IsShown() then
+        Bags.Close("bank")
+    else
+        Bags.Show("bank")
+    end
+end
+
 function Bags.SetColumns(kind, columns)
     if kind == "bank" then
         settings().bankColumns = columns
@@ -691,6 +1012,9 @@ end
 function Bags:Init()
     Bags.windows.inventory = createWindow("inventory", INVENTORY_TOOLTIP or "Inventory")
     Bags.windows.bank = createWindow("bank", BANK or "Bank")
+    loadBankCache()
+    -- Escape closes the bank window (and a live bank session with it, see OnHide)
+    tinsert(UISpecialFrames, "FCUI_Bags_bank")
 end
 
 -- Main bar bag buttons (MainMenuBarBagButtons.xml): hovering one lights up its slots
@@ -727,6 +1051,7 @@ function Bags:Enable()
         Bags.UpdateBag("bank", bagID)
     end)
     ns.RegisterEvent("BAG_UPDATE_DELAYED", self, function()
+        snapshotBank()
         Bags.RefreshAll()
     end)
     ns.RegisterEvent("BAG_CONTAINER_UPDATE", self, function()
@@ -751,10 +1076,21 @@ function Bags:Enable()
         Bags.RefreshAll()
     end)
     ns.RegisterEvent("BANK_TABS_CHANGED", self, function()
+        snapshotBank()
         Bags.RefreshWindow("bank", true)
     end)
     ns.RegisterEvent("PLAYERBANKSLOTS_CHANGED", self, function()
+        snapshotBank()
         Bags.RefreshWindow("bank")
+    end)
+    ns.RegisterEvent("BANKFRAME_OPENED", self, function()
+        bankOpen = true
+        snapshotBank()
+        Bags.RefreshWindow("bank", true)
+    end)
+    ns.RegisterEvent("BANKFRAME_CLOSED", self, function()
+        bankOpen = false
+        Bags.RefreshWindow("bank", true)
     end)
     ns.RegisterEvent("PLAYER_ENTERING_WORLD", self, function()
         Bags.RefreshAll(true)
@@ -782,6 +1118,20 @@ function Bags:Diag()
         ns.Print("  %-9s shown=%s buttons=%d columns=%d", kind, tostring(window:IsShown()), count, columnsFor(kind))
     end
     ns.Print("  inventory bags: %s", table.concat(inventoryBagIDs(), ", "))
-    ns.Print("  bank tabs: %s", table.concat(bankBagIDs(), ", "))
+    ns.Print("  bank tabs: %s (bank %s)", table.concat(bankBagIDs(), ", "), bankLive() and "open" or "closed")
+    local items = 0
+    for _, tab in ipairs(bankCache and bankCache.tabs or {}) do
+        for _ in pairs(tab.slots) do
+            items = items + 1
+        end
+    end
+    local blob = ns.DB.GetBlob(BANK_BLOB)
+    ns.Print(
+        "  bank snapshot: %s, %d tabs, %d items, stored %d chars",
+        bankCache and date("%d.%m. %H:%M", bankCache.seen) or "none",
+        bankCache and #bankCache.tabs or 0,
+        items,
+        blob and #blob or 0
+    )
     ns.Print("  blizzard bags shown=%s", tostring(Bags.Blizzard.AnyBlizzardBagShown()))
 end

@@ -16,6 +16,13 @@ Compat.HasCUnitAuras = (C_UnitAuras ~= nil)
 Compat.HasCSpell = (C_Spell ~= nil)
 Compat.HasSettings = (Settings ~= nil)
 
+-- Secret values: anything flagged secret cannot be compared, boolean-tested
+-- or used as a table key; such values only ever go to widgets. Without
+-- issecretvalue nothing is secret.
+function Compat.IsSecret(value)
+    return issecretvalue ~= nil and issecretvalue(value)
+end
+
 function Compat.Facts()
     return {
         version = version,

@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-18.31" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-19.32" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -426,8 +426,10 @@ SlashCmdList.FCUI = function(input)
             ns.Bags.Junk.SetShiftSell(rest == "shiftsell on")
         elseif rest == "selljunk" then
             ns.Bags.Junk.Sell()
+        elseif rest == "bank" then
+            ns.Bags.ToggleBank()
         else
-            ns.Print("usage: /fcui bags columns <4-20> | bankcolumns <4-24> | shiftsell on|off | selljunk")
+            ns.Print("usage: /fcui bags columns <4-20> | bankcolumns <4-24> | shiftsell on|off | selljunk | bank")
         end
     elseif cmd == "dark" then
         if rest == "on" or rest == "off" then
