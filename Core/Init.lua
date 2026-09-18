@@ -251,11 +251,6 @@ ns.RegisterEvent("PLAYER_LOGIN", ns, function()
         end
     end
     ns.Print(
-        "probes at login: %s | at ADDON_LOADED: %s",
-        tostring(ns.probes.PLAYER_LOGIN),
-        tostring(ns.probes.ADDON_LOADED)
-    )
-    ns.Print(
         "build %s loaded, settings from %s; parts off: %s; dark mode %s",
         ns.BUILD,
         ns.DB.loadedFromFile and ("your saved file (" .. tostring(ns.DB.loadedAt) .. ")")
