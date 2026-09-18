@@ -31,7 +31,8 @@ COMMANDS  (type them in the chat box)
 --------
 
 /fcui                       opens the options window (turn parts on or off, bar scale,
-                            bag columns). Also found under Options > AddOns.
+                            bag columns). Also: the book icon left of the minimap,
+                            or Options > AddOns.
 /fcui status                shows what is running and which old textures are missing
 /fcui missing               lists only the old texture files your client does not have
 /fcui move                  shows green boxes on the player, target, focus and pet

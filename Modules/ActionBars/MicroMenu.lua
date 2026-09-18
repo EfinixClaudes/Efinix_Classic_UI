@@ -73,13 +73,16 @@ local function applyModernTextures(button)
     end
 end
 
+local applying = false
 local function applyTextures(button)
     local entry = reskinned[button]
-    if not entry then
+    if not entry or applying then
         return
     end
+    applying = true
     if entry.modern then
         applyModernTextures(button)
+        applying = false
         return
     end
     local highlight = Assets.Get("Micro.Hilight")
@@ -113,6 +116,7 @@ local function applyTextures(button)
         tex:SetAllPoints(button)
         tex:SetAlpha(1)
     end
+    applying = false
 end
 
 local function applyPortrait(button, pushed)
@@ -160,6 +164,17 @@ local function reskin(button, entry)
         applyPortrait(button, false)
     end
     applyTextures(button)
+
+    -- Blizzard re-applies atlases outside SetPushed/SetNormal too: MainMenuMicroButtonMixin:OnUpdate
+    -- swaps the streaming-status texture kit every tick (SetNormalAtlas & co. at native atlas
+    -- size), which is why the main menu, adventure guide and housing buttons kept growing back.
+    for _, method in ipairs({ "SetNormalAtlas", "SetPushedAtlas", "SetDisabledAtlas", "SetHighlightAtlas" }) do
+        AB.Hook(button, method, function(self)
+            if not applying then
+                applyTextures(self)
+            end
+        end)
+    end
 
     -- SetPushed/SetNormal swap the highlight atlas and move the portrait
     AB.Hook(button, "SetPushed", function(self)
@@ -339,8 +354,21 @@ function MicroMenu.Enable()
 
     -- HelpOpenWebTicketButton (Blizzard_HelpFrame): a 34x35 red "?" Blizzard anchors 25 px
     -- above the outer micro button; 1.12 had no such button, tickets live in the help panel.
-    if HelpOpenWebTicketButton then
-        ns.Suppress(HelpOpenWebTicketButton)
+    -- Blizzard_HelpFrame can load after us, so keep trying until the button exists.
+    local function suppressTicketButton()
+        if HelpOpenWebTicketButton then
+            ns.Suppress(HelpOpenWebTicketButton)
+            return true
+        end
+        return false
+    end
+    if not suppressTicketButton() then
+        ns.RegisterEvent("ADDON_LOADED", MicroMenu, function(_, _, name)
+            if name == "Blizzard_HelpFrame" then
+                suppressTicketButton()
+            end
+        end)
+        ns.RegisterEvent("PLAYER_ENTERING_WORLD", MicroMenu, suppressTicketButton)
     end
 
     for _, entry in ipairs(MODERN) do

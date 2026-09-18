@@ -146,6 +146,12 @@ local function playerArt()
     container.PlayerPortrait:ClearAllPoints()
     container.PlayerPortrait:SetSize(64, 64)
     container.PlayerPortrait:SetPoint("TOPLEFT", frame, "TOPLEFT", 42, -12)
+    -- PlayerFrame.xml anchors the mask at a fixed 24,-19 (60x60), unlike the target
+    -- frame whose mask follows its portrait; pin it to the moved portrait.
+    if container.PlayerPortraitMask then
+        container.PlayerPortraitMask:ClearAllPoints()
+        container.PlayerPortraitMask:SetAllPoints(container.PlayerPortrait)
+    end
 
     -- Status glow: UI-Player-Status 190x66 at 35,-8, additive (Blizzard pulses its alpha)
     local status = file("playerStatus")
