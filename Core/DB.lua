@@ -78,6 +78,8 @@ local migrations = {
 }
 
 function DB.Load()
+    -- remembered for /fcui status: did the game hand us a saved file at all
+    DB.loadedFromFile = type(ForeverClassicUIDB) == "table"
     if type(ForeverClassicUIDB) ~= "table" then
         ForeverClassicUIDB = {}
     end
@@ -91,6 +93,18 @@ function DB.Load()
     copyDefaults(db, DEFAULTS)
     db.version = DEFAULTS.version
     ns.db = db
+    local off = {}
+    for name, enabled in pairs(db.modules) do
+        if not enabled then
+            off[#off + 1] = name
+        end
+    end
+    table.sort(off)
+    DB.loadedSummary = ("file=%s off=[%s] darkMode=%s"):format(
+        tostring(DB.loadedFromFile),
+        table.concat(off, ","),
+        tostring(db.darkMode)
+    )
     return db
 end
 

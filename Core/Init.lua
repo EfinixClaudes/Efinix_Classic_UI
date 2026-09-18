@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-18.19" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-18.20" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -247,6 +247,13 @@ local function status()
         local module = ns.modules[name]
         ns.Print("  %-12s %s%s", name, module.state, module.lastError and (" (" .. module.lastError .. ")") or "")
     end
+    ns.Print("settings at login: %s", tostring(ns.DB.loadedSummary))
+    ns.Print(
+        "settings now: darkMode=%s Bags=%s (saved table intact=%s)",
+        tostring(ns.db.darkMode),
+        tostring(ns.db.modules.Bags),
+        tostring(ns.db == ForeverClassicUIDB)
+    )
     local mediaCount = ns.Assets.MediaCount()
     if mediaCount > 0 then
         ns.Print("local Blizzard art: %d old texture paths served from Media\\Blizzard", mediaCount)

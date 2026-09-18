@@ -59,6 +59,7 @@ local function createCheck(parent, entry, index)
     check:SetScript("OnClick", function(self)
         local enabled = self:GetChecked() == true
         ns.db.modules[entry.key] = enabled
+        ns.Print("%s %s (kept across reloads)", entry.key, enabled and "on" or "off")
         if enabled then
             ns.EnableModule(entry.key)
         else
@@ -163,6 +164,7 @@ local function createFrame()
     end
     dark:SetScript("OnClick", function(self)
         ns.Dark.Set(self:GetChecked() == true)
+        ns.Print("dark mode %s (kept across reloads)", ns.Dark.Enabled() and "on" or "off")
     end)
     frame.DarkMode = dark
 
