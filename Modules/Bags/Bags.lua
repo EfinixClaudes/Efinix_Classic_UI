@@ -579,6 +579,27 @@ local function bagLabel(kind, bagID)
     return EMPTY or "Empty"
 end
 
+-- Bags 1-4 (and the reagent bag) sit in inventory slots; the backpack, the
+-- keyring and bank tabs do not. Only those slots can be picked up or filled.
+local function equippedBagSlot(kind, bagID)
+    if kind ~= "inventory" or bagID == BACKPACK or bagID == KEYRING then
+        return nil
+    end
+    return C_Container.ContainerIDToInventoryID(bagID)
+end
+
+-- The item on the cursor goes to the bag slot: a bag equips or swaps with
+-- the one there, any other item lands inside that bag. Same call as
+-- Blizzard's own bag buttons make (MainMenuBarBagButtons.lua PutItemInBag).
+local function putCursorInBag(kind, bagID)
+    local invSlot = equippedBagSlot(kind, bagID)
+    if not invSlot or not PutItemInBag or not CursorHasItem or not CursorHasItem() then
+        return false
+    end
+    PutItemInBag(invSlot)
+    return true
+end
+
 local function getToggle(window, index)
     local toggle = window.toggles[index]
     if toggle then
@@ -586,6 +607,7 @@ local function getToggle(window, index)
     end
     toggle = CreateFrame("Button", nil, window)
     toggle:SetSize(TOGGLE, TOGGLE)
+    toggle:RegisterForDrag("LeftButton")
     toggle.Icon = toggle:CreateTexture(nil, "ARTWORK")
     toggle.Icon:SetAllPoints()
     toggle.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -595,20 +617,54 @@ local function getToggle(window, index)
     toggle.Border:SetSize(TOGGLE * 64 / 37, TOGGLE * 64 / 37)
     toggle:SetHighlightTexture(Assets.Get("Button.Highlight") or "Interface\\Buttons\\ButtonHilight-Square", "ADD")
     toggle:SetScript("OnClick", function(self)
+        if CursorHasItem and CursorHasItem() then
+            -- a click with an item on the cursor is a drop, never a hide
+            putCursorInBag(window.kind, self.bagID)
+            return
+        end
         local hidden = settings().hidden
         hidden[window.kind] = hidden[window.kind] or {}
         hidden[window.kind][self.bagID] = not hidden[window.kind][self.bagID] or nil
         Bags.RefreshWindow(window.kind, true)
     end)
+    -- Equip and unequip bags through the icons, as on the bottom bar
+    toggle:SetScript("OnDragStart", function(self)
+        local invSlot = equippedBagSlot(window.kind, self.bagID)
+        if invSlot and PickupBagFromSlot then
+            GameTooltip:Hide()
+            PickupBagFromSlot(invSlot)
+        end
+    end)
+    toggle:SetScript("OnReceiveDrag", function(self)
+        putCursorInBag(window.kind, self.bagID)
+    end)
     toggle:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(bagLabel(window.kind, self.bagID), 1, 1, 1)
-        GameTooltip:AddLine(
-            isBagHidden(window.kind, self.bagID) and "Hidden, click to show" or "Click to hide",
-            0.8,
-            0.8,
-            0.8
-        )
+        local invSlot = equippedBagSlot(window.kind, self.bagID)
+        local equipped = false
+        if invSlot and GetInventoryItemLink("player", invSlot) then
+            -- the bag's own item tooltip, as the bottom bar shows it
+            equipped = GameTooltip:SetInventoryItem("player", invSlot) and true or false
+        end
+        if not equipped then
+            GameTooltip:SetText(bagLabel(window.kind, self.bagID), 1, 1, 1)
+        end
+        if invSlot then
+            GameTooltip:AddLine(
+                equipped and "Drag to unequip, drop a bag here to swap" or "Drop a bag here to equip",
+                0.8,
+                0.8,
+                0.8
+            )
+        end
+        if not invSlot or equipped then
+            GameTooltip:AddLine(
+                isBagHidden(window.kind, self.bagID) and "Hidden, click to show" or "Click to hide",
+                0.8,
+                0.8,
+                0.8
+            )
+        end
         GameTooltip:Show()
         Bags.HighlightBag(window.kind, self.bagID, true)
     end)

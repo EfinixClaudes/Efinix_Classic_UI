@@ -105,6 +105,9 @@ BAGS
 
 Press B or click the backpack as usual, everything opens in one window.
 Click a bag icon at the top of the window to hide or show that bag's slots.
+Drag a bag icon off to unequip that bag, or drop a bag onto an icon to equip it
+there (or swap it with the bag already in that slot). Hovering an icon shows the
+bag's own tooltip. The bag buttons on the bottom bar work the same way.
 Hover a bag icon (in the window or on the bottom bar) to light up the slots that
 belong to that bag. The keyring only shows the rows that hold keys.
 Type in the search box to dim everything that does not match.
