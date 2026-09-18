@@ -145,10 +145,13 @@ function ST.Position()
         if frame then
             Raw.SetScale(frame, scale)
             Raw.SetSize(frame, BAR_WIDTH, BAR_HEIGHT)
-            Raw.ClearAllPoints(frame)
-            Raw.SetPoint(frame, "BOTTOM", UIParent, "BOTTOM", 0, y / scale)
-            if canSwing(frame) then
-                y = y + ROW_PITCH
+            -- a bar the player dragged in Edit Mode keeps that position and leaves the stack
+            if ns.Compat.InEditModeDefault(frame) then
+                Raw.ClearAllPoints(frame)
+                Raw.SetPoint(frame, "BOTTOM", UIParent, "BOTTOM", 0, y / scale)
+                if canSwing(frame) then
+                    y = y + ROW_PITCH
+                end
             end
         end
     end

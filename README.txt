@@ -83,9 +83,11 @@ Loot window: the small 2006 loot panel with four item slots and page arrows
 opens at the top left, or under the mouse if you have that option turned on.
 The options window (/fcui) lets you turn the spellbook and loot window off
 if you prefer the game's own versions.
-Edit Mode still works for things the addon does not manage; positions and sizes
-of the frames listed above are set by the addon, except the chat frame and the
-tooltip, which keep a position you gave them in Edit Mode.
+Edit Mode still works for things the addon does not manage. The addon puts the
+player, target, focus, pet, cast bar, swing timer, chat and tooltip frames in
+their 2006 places, but as soon as you drag one of them in Edit Mode and save,
+it stays where you put it. "Reset to default" in Edit Mode brings the 2006
+position back.
 
 
 BAGS

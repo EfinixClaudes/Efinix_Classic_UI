@@ -217,9 +217,12 @@ function CB.Position()
     positioning = true
     local scale = ns.db.scale or 1
     Raw.SetScale(frame, scale)
-    Raw.ClearAllPoints(frame)
-    -- CastingBarFrame.lua 1.12: SetPoint("BOTTOM", UIParent, "BOTTOM", 0, castingBarPosition)
-    Raw.SetPoint(frame, "BOTTOM", UIParent, "BOTTOM", 0, CB.LayoutY() / scale)
+    -- a bar the player dragged in Edit Mode keeps that position
+    if ns.Compat.InEditModeDefault(frame) then
+        Raw.ClearAllPoints(frame)
+        -- CastingBarFrame.lua 1.12: SetPoint("BOTTOM", UIParent, "BOTTOM", 0, castingBarPosition)
+        Raw.SetPoint(frame, "BOTTOM", UIParent, "BOTTOM", 0, CB.LayoutY() / scale)
+    end
     positioning = false
 end
 

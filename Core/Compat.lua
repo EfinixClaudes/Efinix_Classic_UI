@@ -62,6 +62,18 @@ function Compat.IsRested()
     return state == 1
 end
 
+-- Edit Mode: has the player left this system frame where Blizzard puts it.
+-- Our 1.12 default positions only apply then; a frame the player dragged in
+-- Edit Mode keeps the position Edit Mode saved for it. Frames without the
+-- Edit Mode system mixin count as "default".
+function Compat.InEditModeDefault(frame)
+    if not frame or type(frame.IsInDefaultPosition) ~= "function" then
+        return true
+    end
+    local ok, result = pcall(frame.IsInDefaultPosition, frame)
+    return ok and result ~= false
+end
+
 -- Edit Mode: is the manager currently open. Only used to avoid fighting the
 -- user while they drag frames around; never used in combat paths.
 function Compat.IsEditModeActive()
