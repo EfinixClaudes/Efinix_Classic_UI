@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-18.22" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-18.23" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -202,22 +202,43 @@ ns.RegisterEvent("ADDON_LOADED", ns, function(_, _, loaded)
     if loaded ~= ADDON then
         return
     end
-    ns.DB.Load()
+    ns.DB.Adopt("ADDON_LOADED")
+    if not ns.db then
+        ns.DB.Load()
+        ns.DB.loadedAt = "ADDON_LOADED(defaults)"
+    end
     ns.Assets.Verify()
     ns.loaded = true
+end)
+
+-- the saved table may only appear after ADDON_LOADED; take it as soon as it does
+ns.RegisterEvent("VARIABLES_LOADED", ns, function()
+    ns.DB.Adopt("VARIABLES_LOADED")
 end)
 
 ns.RegisterEvent("PLAYER_LOGIN", ns, function()
     if not ns.loaded then
         return
     end
+    ns.DB.Adopt("PLAYER_LOGIN")
     for _, name in ipairs(ns.moduleOrder) do
         ns.EnableModule(name)
     end
     ns.RegisterEvent("PLAYER_ENTERING_WORLD", ns, function()
+        -- too late to switch silently: modules already run on the other table
+        if ns.DB.Adopt("PLAYER_ENTERING_WORLD") then
+            ns.Print("saved settings arrived late, /reload once to apply them")
+        end
+    end)
+    ns.RegisterEvent("PLAYER_ENTERING_WORLD", ns, function()
         ns.RefreshAll()
     end)
     ns.Options.RegisterSettings()
+    local seen = {}
+    for _, event in ipairs({ "ADDON_LOADED", "VARIABLES_LOADED", "PLAYER_LOGIN" }) do
+        seen[#seen + 1] = event .. "=" .. tostring(ns.DB.seen[event])
+    end
+    ns.Log("DB", "saved table by event: %s; loaded at %s", table.concat(seen, " "), tostring(ns.DB.loadedAt))
     local off = {}
     for _, name in ipairs(ns.moduleOrder) do
         if ns.modules[name].state ~= "enabled" then
@@ -227,7 +248,8 @@ ns.RegisterEvent("PLAYER_LOGIN", ns, function()
     ns.Print(
         "build %s loaded, settings from %s; parts off: %s; dark mode %s",
         ns.BUILD,
-        ns.DB.loadedFromFile and "your saved file" or "defaults (no saved file yet)",
+        ns.DB.loadedFromFile and ("your saved file (" .. tostring(ns.DB.loadedAt) .. ")")
+            or "defaults (no saved file at " .. tostring(ns.DB.loadedAt) .. ")",
         #off > 0 and table.concat(off, ", ") or "none",
         ns.Dark.Enabled() and "on" or "off"
     )
@@ -259,7 +281,12 @@ local function status()
         local module = ns.modules[name]
         ns.Print("  %-12s %s%s", name, module.state, module.lastError and (" (" .. module.lastError .. ")") or "")
     end
-    ns.Print("settings at login: %s", tostring(ns.DB.loadedSummary))
+    ns.Print("settings at login: %s (loaded at %s)", tostring(ns.DB.loadedSummary), tostring(ns.DB.loadedAt))
+    for _, line in ipairs(ns.log) do
+        if line:find("saved table by event", 1, true) then
+            ns.Print(line)
+        end
+    end
     ns.Print(
         "settings now: darkMode=%s Bags=%s (saved table intact=%s)",
         tostring(ns.db.darkMode),

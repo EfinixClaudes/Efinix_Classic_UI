@@ -77,6 +77,29 @@ local migrations = {
     end,
 }
 
+-- On this client the saved file is not always in place when ADDON_LOADED
+-- fires for us. Load reads whatever the global holds; Adopt is called again
+-- on the later login events and switches to the game's table if it showed
+-- up (or got replaced) in the meantime. DB.seen records the event that first
+-- saw a saved table, for /fcui status.
+DB.seen = {} -- event -> "file" | "none" | "ours"
+
+function DB.Adopt(event)
+    local saved = ForeverClassicUIDB
+    if type(saved) ~= "table" then
+        DB.seen[event] = "none"
+        return false
+    end
+    if saved == ns.db then
+        DB.seen[event] = "ours"
+        return false
+    end
+    DB.seen[event] = "file"
+    DB.Load()
+    DB.loadedAt = event
+    return true
+end
+
 function DB.Load()
     -- remembered for /fcui status: did the game hand us a saved file at all
     DB.loadedFromFile = type(ForeverClassicUIDB) == "table"
