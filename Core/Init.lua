@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-18.26" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-18.27" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -296,7 +296,7 @@ local function status()
         "settings now: darkMode=%s Bags=%s (saved table intact=%s)",
         tostring(ns.db.darkMode),
         tostring(ns.db.modules.Bags),
-        tostring(ns.db == ForeverClassicUIDB)
+        tostring(ns.db == EfinixClassicUICharSettings)
     )
     local mediaCount = ns.Assets.MediaCount()
     if mediaCount > 0 then

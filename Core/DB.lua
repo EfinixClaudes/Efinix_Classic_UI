@@ -88,7 +88,7 @@ local migrations = {
 DB.seen = {} -- event -> "file" | "none" | "ours"
 
 function DB.Adopt(event)
-    local saved = ForeverClassicUIDB
+    local saved = EfinixClassicUICharSettings
     if type(saved) ~= "table" then
         DB.seen[event] = "none"
         return false
@@ -105,16 +105,16 @@ end
 
 -- Make our table the saved global if the game never provided one.
 function DB.Publish()
-    if type(ForeverClassicUIDB) ~= "table" and ns.db then
-        ForeverClassicUIDB = ns.db
+    if type(EfinixClassicUICharSettings) ~= "table" and ns.db then
+        EfinixClassicUICharSettings = ns.db
         DB.published = true
     end
 end
 
 function DB.Load()
     -- remembered for /fcui status: did the game hand us a saved file at all
-    DB.loadedFromFile = type(ForeverClassicUIDB) == "table"
-    local db = ForeverClassicUIDB
+    DB.loadedFromFile = type(EfinixClassicUICharSettings) == "table"
+    local db = EfinixClassicUICharSettings
     if type(db) ~= "table" then
         db = {} -- private until DB.Publish; the game's file must be able to take the global
     end
@@ -143,6 +143,6 @@ function DB.Load()
 end
 
 function DB.Reset()
-    ForeverClassicUIDB = {}
+    EfinixClassicUICharSettings = {}
     DB.Load()
 end
