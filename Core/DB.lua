@@ -77,11 +77,13 @@ local migrations = {
     end,
 }
 
--- On this client the saved file is not always in place when ADDON_LOADED
--- fires for us. Load reads whatever the global holds; Adopt is called again
--- on the later login events and switches to the game's table if it showed
--- up (or got replaced) in the meantime. DB.seen records the event that first
--- saw a saved table, for /fcui status.
+-- On this client the saved table is not in place when ADDON_LOADED fires for
+-- us, and a global we create in the meantime is never replaced by the file
+-- (seen in game: ADDON_LOADED none, VARIABLES_LOADED ours, PLAYER_LOGIN
+-- ours). So the global is left untouched until the last login event; the
+-- defaults live in a private table until then and are only published as the
+-- global (for saving) once the game had every chance to provide the file.
+-- DB.seen records what each event found, for /fcui status.
 DB.seen = {} -- event -> "file" | "none" | "ours"
 
 function DB.Adopt(event)
@@ -100,13 +102,21 @@ function DB.Adopt(event)
     return true
 end
 
+-- Make our table the saved global if the game never provided one.
+function DB.Publish()
+    if type(ForeverClassicUIDB) ~= "table" and ns.db then
+        ForeverClassicUIDB = ns.db
+        DB.published = true
+    end
+end
+
 function DB.Load()
     -- remembered for /fcui status: did the game hand us a saved file at all
     DB.loadedFromFile = type(ForeverClassicUIDB) == "table"
-    if type(ForeverClassicUIDB) ~= "table" then
-        ForeverClassicUIDB = {}
-    end
     local db = ForeverClassicUIDB
+    if type(db) ~= "table" then
+        db = {} -- private until DB.Publish; the game's file must be able to take the global
+    end
     local from = tonumber(db.version) or 0
     for v = from + 1, DEFAULTS.version do
         if migrations[v] then

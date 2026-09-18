@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-18.23" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-18.24" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -229,6 +229,11 @@ ns.RegisterEvent("PLAYER_LOGIN", ns, function()
         if ns.DB.Adopt("PLAYER_ENTERING_WORLD") then
             ns.Print("saved settings arrived late, /reload once to apply them")
         end
+        -- the game had every chance to hand us the file; from here on our table is the saved one
+        ns.DB.Publish()
+    end)
+    ns.RegisterEvent("PLAYER_LOGOUT", ns, function()
+        ns.DB.Publish()
     end)
     ns.RegisterEvent("PLAYER_ENTERING_WORLD", ns, function()
         ns.RefreshAll()

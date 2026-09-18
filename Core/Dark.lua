@@ -272,6 +272,10 @@ local function applyContrast()
             C_CVar.SetCVar(CONTRAST_CVAR, tostring(ns.db.darkContrastPrevious))
         end
         ns.db.darkContrastPrevious = nil
+    elseif current == CONTRAST_DARK then
+        -- dark mode is off but the game still has our value (settings were lost): back to the default
+        C_CVar.SetCVar(CONTRAST_CVAR, "0")
+        ns.Log("Dark", "questTextContrast was left at 4, reset to 0")
     end
 end
 
