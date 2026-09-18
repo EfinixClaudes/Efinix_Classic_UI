@@ -43,6 +43,9 @@ Modules\Nameplates\Nameplates.lua
 
 Modules\RaidFrames\RaidFrames.lua
 
+Modules\Panels\Loot.lua
+Modules\Panels\SpellBook.lua
+
 Modules\Bags\Bags.lua
 Modules\Bags\Blizzard.lua
 Modules\Bags\Junk.lua

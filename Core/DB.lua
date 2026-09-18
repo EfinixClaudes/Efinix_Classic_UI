@@ -17,6 +17,8 @@ local DEFAULTS = {
         Tooltip = true,
         Nameplates = true,
         RaidFrames = true,
+        LootFrame = true,
+        SpellBook = true,
         Bags = true,
     },
     -- Nameplates: the player's nameplateStyle cvar before we switched it to Classic
