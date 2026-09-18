@@ -126,7 +126,7 @@ end
 
 local function createFrame()
     frame = CreateFrame("Frame", "FCUI_OptionsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(WIDTH, 52 + #MODULES * ROW + 150 + 2 * SLIDER_ROW)
+    frame:SetSize(WIDTH, 52 + (#MODULES + 1) * ROW + 150 + 2 * SLIDER_ROW)
     frame:SetPoint("CENTER")
     frame:SetFrameStrata("DIALOG")
     frame:SetToplevel(true)
@@ -137,6 +137,7 @@ local function createFrame()
     frame:SetScript("OnDragStart", frame.StartMoving)
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     frame:SetBackdrop(BACKDROP)
+    ns.Dark.Backdrop(frame, 1, 1, 1)
     frame:Hide()
 
     frame.Title = frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -148,7 +149,23 @@ local function createFrame()
         frame.checks[entry.key] = createCheck(frame, entry, index)
     end
 
-    local y = -52 - #MODULES * ROW - 24
+    -- dark mode: an addon option, not a module; applies at once
+    local dark = CreateFrame("CheckButton", "FCUI_Option_DarkMode", frame, "UICheckButtonTemplate")
+    dark:SetSize(24, 24)
+    dark:SetPoint("TOPLEFT", frame, "TOPLEFT", 24, -52 - #MODULES * ROW)
+    local darkText = dark.Text or dark.text or _G[dark:GetName() .. "Text"]
+    if darkText then
+        darkText:SetFontObject(GameFontNormal)
+        darkText:SetText("Dark mode (frame art tinted dark)")
+        darkText:ClearAllPoints()
+        darkText:SetPoint("LEFT", dark, "RIGHT", 4, 0)
+    end
+    dark:SetScript("OnClick", function(self)
+        ns.Dark.Set(self:GetChecked() == true)
+    end)
+    frame.DarkMode = dark
+
+    local y = -52 - (#MODULES + 1) * ROW - 24
     frame.Scale = createSlider(frame, "FCUI_OptionScale", "Bar scale", 0.5, 2, 0.05, y, function()
         return ns.db.scale or 1
     end, function(value)
@@ -237,6 +254,9 @@ function Options.Refresh()
     end
     for key, check in pairs(frame.checks) do
         check:SetChecked(ns.db.modules[key] == true)
+    end
+    if frame.DarkMode then
+        frame.DarkMode:SetChecked(ns.Dark.Enabled())
     end
     if frame.Scale then
         frame.Scale:Refresh()

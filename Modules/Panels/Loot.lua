@@ -144,6 +144,7 @@ local function createFrame()
     frame.Panel = frame:CreateTexture(nil, "BACKGROUND")
     frame.Panel:SetTexture(tex("panel"))
     frame.Panel:SetAllPoints()
+    ns.Dark.Tint(frame.Panel)
     -- LootFramePortraitOverlay 58x58 at TOPLEFT 10,-8
     frame.Overlay = frame:CreateTexture(nil, "ARTWORK")
     frame.Overlay:SetTexture(tex("dead"))

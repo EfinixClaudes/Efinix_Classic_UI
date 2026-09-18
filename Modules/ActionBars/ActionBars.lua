@@ -238,6 +238,9 @@ function AB.CreateStanceArt()
     frame.Right:SetTexture(ends)
     frame.Right:SetSize(42, 50)
     frame.Right:SetTexCoord(0.34375, 1, 0, 0.78125) -- ShapeshiftBarEnds right half: 42/64 from the right
+    ns.Dark.Tint(frame.Left)
+    ns.Dark.Tint(frame.Middle)
+    ns.Dark.Tint(frame.Right)
     frame:Hide()
     AB.stanceArt = frame
 end
@@ -295,6 +298,8 @@ function AB.CreatePetArt()
     t1:SetSize(184, 44)
     t1:SetPoint("LEFT", t0, "RIGHT")
     t1:SetTexCoord(0, 0.71875, 0.375, 0.71875)
+    ns.Dark.Tint(t0)
+    ns.Dark.Tint(t1)
     frame:Hide()
     AB.petArt = frame
 end

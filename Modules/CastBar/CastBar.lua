@@ -153,6 +153,7 @@ local function applyLook(frame)
         border:SetSize(256, 64) -- CastingBarBorder 256x64 at TOP 0,28
         border:SetPoint("TOP", frame, "TOP", 0, 28)
         border:Show()
+        ns.Dark.Tint(border)
     end
 
     local background = frame.Background

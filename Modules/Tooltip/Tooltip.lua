@@ -87,7 +87,7 @@ local function skin(tooltip)
     frame:SetFrameLevel(tooltip:GetFrameLevel())
     frame:SetBackdrop(BACKDROP)
     frame:SetBackdropColor(BACKGROUND_COLOR[1], BACKGROUND_COLOR[2], BACKGROUND_COLOR[3])
-    frame:SetBackdropBorderColor(BORDER_COLOR[1], BORDER_COLOR[2], BORDER_COLOR[3])
+    ns.Dark.Backdrop(frame, BORDER_COLOR[1], BORDER_COLOR[2], BORDER_COLOR[3])
     backdrops[tooltip] = frame
 
     -- Blizzard's nine-slice art stays in place but invisible; SharedTooltip_SetBackdropStyle

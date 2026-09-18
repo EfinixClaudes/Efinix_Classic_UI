@@ -78,6 +78,7 @@ local function skin(frame)
     end
     border:SetSize(256, 64)
     border:SetPoint("TOP", frame, "TOP", 0, 28)
+    ns.Dark.Tint(border)
     borders[frame] = border
 
     -- spark: CastingBarSpark 32x32 additive, riding the fill's right edge

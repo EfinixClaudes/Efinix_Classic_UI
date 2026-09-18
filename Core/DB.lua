@@ -6,6 +6,7 @@ ns.DB = DB
 local DEFAULTS = {
     version = 4,
     scale = 1,
+    darkMode = false, -- frame art tinted dark grey (addon option)
     modules = {
         ActionBars = true,
         UnitFrames = true,

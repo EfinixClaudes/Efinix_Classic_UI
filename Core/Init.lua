@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-18.13" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-18.14" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -358,12 +358,19 @@ SlashCmdList.FCUI = function(input)
         else
             ns.Print("usage: /fcui bags columns <4-20> | bankcolumns <4-24> | shiftsell on|off | selljunk")
         end
+    elseif cmd == "dark" then
+        if rest == "on" or rest == "off" then
+            ns.Dark.Set(rest == "on")
+            ns.Print("dark mode %s", rest)
+        else
+            ns.Print("usage: /fcui dark on|off (currently %s)", ns.Dark.Enabled() and "on" or "off")
+        end
     elseif cmd == "reset" then
         ns.DB.Reset()
         ns.Print("settings reset, /reload to apply")
     else
         ns.Print("commands: options, status, missing, diag [module], enable <module>, disable <module>, scale <n>")
-        ns.Print("          move [reset], bags columns <n>, bags bankcolumns <n>, reset")
+        ns.Print("          move [reset], bags columns <n>, bags bankcolumns <n>, dark on|off, reset")
     end
 end
 _G.SLASH_FCUI1 = "/fcui"

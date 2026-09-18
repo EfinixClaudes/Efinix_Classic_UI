@@ -42,6 +42,7 @@ function MainBar.Create()
             tex:SetSize(256, 43)
             tex:SetPoint("BOTTOM", art, "BOTTOM", offsets[i], 0)
             tex:SetTexCoord(0, 1, coords[i][1], coords[i][2])
+            ns.Dark.Tint(tex)
             art.Textures[i] = tex
         end
     end
@@ -61,6 +62,8 @@ function MainBar.Create()
         art.RightEndCap:SetSize(128, 128)
         art.RightEndCap:SetPoint("BOTTOM", art, "BOTTOM", 544, 0)
         art.RightEndCap:SetTexCoord(1, 0, 0, 1)
+        ns.Dark.Tint(art.LeftEndCap)
+        ns.Dark.Tint(art.RightEndCap)
     end
 
     MainBar.CreateLatencyBar(art)

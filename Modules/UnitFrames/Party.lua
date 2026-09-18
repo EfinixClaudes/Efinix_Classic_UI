@@ -137,6 +137,7 @@ local function memberArt(frame)
     local art = file("party")
     if art then
         frame.Texture:SetTexture(art)
+        ns.Dark.Tint(frame.Texture)
         frame.Texture:SetTexCoord(0, 1, 0, 1)
         frame.Texture:ClearAllPoints()
         frame.Texture:SetSize(128, 64)
@@ -202,6 +203,7 @@ local function memberArt(frame)
     if pet then
         if art and pet.Texture then
             pet.Texture:SetTexture(art)
+            ns.Dark.Tint(pet.Texture)
             pet.Texture:SetTexCoord(0, 1, 0, 1)
             pet.Texture:SetScale(1)
             pet.Texture:ClearAllPoints()

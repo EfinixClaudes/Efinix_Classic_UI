@@ -16,6 +16,7 @@ Core\Combat.lua
 Core\Hide.lua
 Core\Assets.lua
 Core\DB.lua
+Core\Dark.lua
 Core\Options.lua
 
 Modules\ActionBars\ActionBars.lua

@@ -162,6 +162,13 @@ local function createBorder(chatFrame)
     right:SetPoint("TOP", pieces.TopRight, "BOTTOM")
     right:SetPoint("BOTTOM", pieces.BottomRight, "TOP")
     right:SetTexCoord(0.75, 1, 0.125, 0.7265625)
+    for _, piece in pairs(pieces) do
+        ns.Dark.Tint(piece)
+    end
+    ns.Dark.Tint(top)
+    ns.Dark.Tint(bottom)
+    ns.Dark.Tint(left)
+    ns.Dark.Tint(right)
     borders[chatFrame] = frame
 end
 
@@ -267,7 +274,7 @@ local function resetTabColors(tab)
     end
     for _, key in ipairs({ "Left", "Middle", "Right" }) do
         if tab[key] then
-            tab[key]:SetVertexColor(1, 1, 1)
+            ns.Dark.Tint(tab[key], 1, 1, 1)
         end
     end
     for _, key in ipairs({ "ActiveLeft", "ActiveMiddle", "ActiveRight" }) do
@@ -318,13 +325,16 @@ local function styleEditBox(editBox)
         leftTex:SetTexture(left)
         leftTex:SetTexCoord(0, 1, 0, 1)
         leftTex:SetSize(256, 32)
+        ns.Dark.Tint(leftTex)
     end
     if right and rightTex then
         rightTex:SetTexture(right)
         rightTex:SetTexCoord(0.9375, 1, 0, 1)
         rightTex:SetSize(16, 32)
+        ns.Dark.Tint(rightTex)
     end
     if right and midTex then
+        ns.Dark.Tint(midTex)
         midTex:SetTexture(right)
         midTex:SetHorizTile(false)
         midTex:SetTexCoord(0, 0.9375, 0, 1)

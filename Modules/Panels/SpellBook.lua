@@ -428,6 +428,7 @@ local function createFrame()
         t:SetTexture(tex(key))
         t:SetSize(width, height)
         t:SetPoint(point)
+        ns.Dark.Tint(t)
         return t
     end
     panel("topLeft", 256, 256, "TOPLEFT")

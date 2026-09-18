@@ -11,8 +11,8 @@ the old micro menu and bag buttons, the old player/target/pet/party frames, the
 thin yellow cast bar, the round minimap with its sun/moon icon, buffs and debuffs
 in the top right corner, the old chat frame with its scroll buttons, the dark blue
 tooltips, the classic nameplates, the old spellbook and loot window, a weapon swing
-timer, a classic-styled all-in-one bag window and unit frames you can drag wherever
-you like.
+timer, a classic-styled all-in-one bag window, unit frames you can drag wherever
+you like, and an optional dark mode for all the frame art.
 
 
 INSTALL
@@ -45,6 +45,9 @@ COMMANDS  (type them in the chat box)
 /fcui bags selljunk         sells all grey items (only at a vendor)
 /fcui bags shiftsell off    turns the hold-Shift auto sell and repair off (on = back on)
 /fcui scale 1.1             makes the whole bottom bar bigger or smaller (0.5-2.0)
+/fcui dark on               dark mode: all frame art (bars, unit frames, minimap,
+                            chat, tooltips, windows) tinted dark grey; "off" undoes it.
+                            Also a checkbox in the options window.
 /fcui disable Bags          turns a part off. Parts: ActionBars, UnitFrames, CastBar,
                             SwingTimer, Minimap, Auras, Chat, Tooltip, Nameplates,
                             RaidFrames, LootFrame, SpellBook, Bags.

@@ -205,6 +205,7 @@ local function decorate(container)
             tex:SetSize(256, 10)
             tex:SetPoint("BOTTOM", container, "BOTTOM", offsets[i], 3)
             tex:SetTexCoord(0, 1, coords[i][1], coords[i][2])
+            ns.Dark.Tint(tex)
             art.xp[i] = tex
         end
     end
@@ -229,6 +230,7 @@ local function decorate(container)
                 tex:SetPoint("TOPLEFT", container, "TOPLEFT", 0, 2)
             end
             tex:SetTexCoord(0, 1, coords[i][1], coords[i][2])
+            ns.Dark.Tint(tex)
             art.rep[i] = tex
             previous = tex
         end
@@ -280,6 +282,7 @@ local function createMaxLevelArt()
             t:SetPoint("BOTTOM", frame, "TOP", -384, 0)
         end
         t:SetTexCoord(0, 1, coords[i][1], coords[i][2])
+        ns.Dark.Tint(t)
         previous = t
     end
     frame:Hide()

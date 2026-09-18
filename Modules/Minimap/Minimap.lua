@@ -81,6 +81,8 @@ local function createArt()
         art.Ring:SetSize(192, 192)
         art.Ring:SetPoint("CENTER", art, "CENTER", 0, -20)
         art.Ring:SetTexCoord(0.25, 1, 0.125, 0.875)
+        ns.Dark.Tint(art.Top)
+        ns.Dark.Tint(art.Ring)
     end
     MM.art = art
 end
@@ -214,6 +216,7 @@ local function createTrackingArt()
         art.Border:SetTexture(border)
         art.Border:SetSize(64, 64)
         art.Border:SetPoint("TOPLEFT", tracking, "TOPLEFT", 0, 0)
+        ns.Dark.Tint(art.Border)
     end
     MM.trackingArt = art
 end
@@ -290,6 +293,7 @@ local function createMailArt()
         art.Border:SetTexture(border)
         art.Border:SetSize(52, 52)
         art.Border:SetPoint("TOPLEFT", mail, "TOPLEFT", 0, 0)
+        ns.Dark.Tint(art.Border)
     end
     MM.mailArt = art
 end
