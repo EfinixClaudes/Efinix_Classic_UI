@@ -59,6 +59,7 @@ local function createCheck(parent, entry, index)
     check:SetScript("OnClick", function(self)
         local enabled = self:GetChecked() == true
         ns.db.modules[entry.key] = enabled
+        ns.DB.Flush()
         ns.Print("%s %s (kept across reloads)", entry.key, enabled and "on" or "off")
         if enabled then
             ns.EnableModule(entry.key)
@@ -164,6 +165,7 @@ local function createFrame()
     end
     dark:SetScript("OnClick", function(self)
         ns.Dark.Set(self:GetChecked() == true)
+        ns.DB.Flush()
         ns.Print("dark mode %s (kept across reloads)", ns.Dark.Enabled() and "on" or "off")
     end)
     frame.DarkMode = dark
@@ -237,6 +239,7 @@ local function createFrame()
     reload:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 24, 20)
     reload:SetText("Save & Reload")
     reload:SetScript("OnClick", function()
+        ns.DB.Flush()
         ReloadUI()
     end)
     local close = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")

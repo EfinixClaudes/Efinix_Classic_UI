@@ -77,46 +77,165 @@ local migrations = {
     end,
 }
 
--- Forever (build 69913) writes account-wide SavedVariables but never loads
--- them back (probed in game 2026-09-18: an account variable came back nil at
--- every login event, a per-character variable and a registered cvar came
--- back fine). The settings therefore live in a SavedVariablesPerCharacter
--- variable, which is in place at ADDON_LOADED. The adopt/publish dance below
--- stays as a guard: the global is left alone until the last login event, and
--- our table is only published for saving if the game provided nothing.
+-- Forever (build 69913) writes SavedVariables but does not load our
+-- settings table back, account-wide or per character, while a small
+-- per-character table holding only strings did come back (probed in game
+-- 2026-09-18). So the settings are stored as ONE STRING inside a
+-- per-character variable: { data = "<encoded>" }. Encode/Decode below is a
+-- flat "path=value" format for plain tables (string/number keys,
+-- string/number/boolean values), no Lua parsing needed. ns.db is always a
+-- private table; the global only ever holds the encoded copy, refreshed by
+-- DB.Flush after every settings change and at logout.
 -- DB.seen records what each event found, for /fcui status.
-DB.seen = {} -- event -> "file" | "none" | "ours"
+DB.seen = {} -- event -> "file" | "none" | "legacy"
 
+local function escape(text)
+    return (tostring(text):gsub("[^%w]", function(c)
+        return ("%%%02X"):format(c:byte())
+    end))
+end
+
+local function unescape(text)
+    return (text:gsub("%%(%x%x)", function(hex)
+        return string.char(tonumber(hex, 16))
+    end))
+end
+
+local function encodeKey(key)
+    if type(key) == "number" then
+        return "n" .. tostring(key)
+    end
+    return "s" .. escape(key)
+end
+
+local function decodeKey(text)
+    local kind, body = text:sub(1, 1), text:sub(2)
+    if kind == "n" then
+        return tonumber(body)
+    end
+    return unescape(body)
+end
+
+local function encodeValue(value)
+    local kind = type(value)
+    if kind == "boolean" then
+        return value and "b1" or "b0"
+    elseif kind == "number" then
+        return "n" .. tostring(value)
+    end
+    return "s" .. escape(value)
+end
+
+local function decodeValue(text)
+    local kind, body = text:sub(1, 1), text:sub(2)
+    if kind == "b" then
+        return body == "1"
+    elseif kind == "n" then
+        return tonumber(body)
+    end
+    return unescape(body)
+end
+
+local function encodeInto(out, tbl, prefix, depth)
+    if depth > 8 then
+        return
+    end
+    for key, value in pairs(tbl) do
+        local keyKind, valueKind = type(key), type(value)
+        if keyKind == "string" or keyKind == "number" then
+            local path = prefix .. encodeKey(key)
+            if valueKind == "table" then
+                if next(value) == nil then
+                    out[#out + 1] = path .. "=t" -- empty table
+                else
+                    encodeInto(out, value, path .. ".", depth + 1)
+                end
+            elseif valueKind == "string" or valueKind == "number" or valueKind == "boolean" then
+                out[#out + 1] = path .. "=" .. encodeValue(value)
+            end
+        end
+    end
+end
+
+function DB.Encode(tbl)
+    local out = {}
+    encodeInto(out, tbl, "", 0)
+    table.sort(out)
+    return table.concat(out, ";")
+end
+
+function DB.Decode(text)
+    local root = {}
+    if type(text) ~= "string" then
+        return root
+    end
+    for entry in text:gmatch("[^;]+") do
+        local path, value = entry:match("^(.-)=(.*)$")
+        if path then
+            local node = root
+            local segments = {}
+            for segment in path:gmatch("[^.]+") do
+                segments[#segments + 1] = segment
+            end
+            for i = 1, #segments - 1 do
+                local key = decodeKey(segments[i])
+                if type(node[key]) ~= "table" then
+                    node[key] = {}
+                end
+                node = node[key]
+            end
+            local last = decodeKey(segments[#segments])
+            if last ~= nil then
+                if value == "t" then
+                    node[last] = {}
+                else
+                    node[last] = decodeValue(value)
+                end
+            end
+        end
+    end
+    return root
+end
+
+-- Read the saved global if it holds settings we have not taken yet.
 function DB.Adopt(event)
     local saved = EfinixClassicUICharSettings
     if type(saved) ~= "table" then
         DB.seen[event] = "none"
         return false
     end
-    if saved == ns.db then
-        DB.seen[event] = "ours"
+    if DB.loadedFromFile then
+        DB.seen[event] = "taken"
         return false
     end
-    DB.seen[event] = "file"
+    DB.seen[event] = type(saved.data) == "string" and "file" or "legacy"
     DB.Load()
     DB.loadedAt = event
     return true
 end
 
--- Make our table the saved global if the game never provided one.
-function DB.Publish()
-    if type(EfinixClassicUICharSettings) ~= "table" and ns.db then
-        EfinixClassicUICharSettings = ns.db
-        DB.published = true
+-- Put the encoded settings into the saved global (a fresh, strings-only table).
+function DB.Flush()
+    if not ns.db then
+        return
     end
+    local data = DB.Encode(ns.db)
+    EfinixClassicUICharSettings = { data = data, build = tostring(ns.BUILD), length = tostring(#data) }
+    DB.flushed = #data
 end
 
 function DB.Load()
-    -- remembered for /fcui status: did the game hand us a saved file at all
-    DB.loadedFromFile = type(EfinixClassicUICharSettings) == "table"
-    local db = EfinixClassicUICharSettings
-    if type(db) ~= "table" then
-        db = {} -- private until DB.Publish; the game's file must be able to take the global
+    local saved = EfinixClassicUICharSettings
+    local db
+    if type(saved) == "table" and type(saved.data) == "string" then
+        db = DB.Decode(saved.data)
+        DB.loadedFromFile = true
+    elseif type(saved) == "table" and type(saved.modules) == "table" then
+        db = saved -- a table from an earlier build, taken as is
+        DB.loadedFromFile = true
+    else
+        db = {}
+        DB.loadedFromFile = false
     end
     local from = tonumber(db.version) or 0
     for v = from + 1, DEFAULTS.version do
@@ -143,6 +262,8 @@ function DB.Load()
 end
 
 function DB.Reset()
-    EfinixClassicUICharSettings = {}
+    EfinixClassicUICharSettings = nil
+    DB.loadedFromFile = false
     DB.Load()
+    DB.Flush()
 end

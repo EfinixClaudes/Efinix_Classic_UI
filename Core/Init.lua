@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-18.27" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-18.28" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -198,10 +198,31 @@ end
 ---------------------------------------------------------------------------
 -- Startup
 ---------------------------------------------------------------------------
+-- Typed probes (per character): which value types come back on this client.
+local PROBES = {
+    { name = "EfinixClassicUIProbeS", label = "strings", value = { a = "x" } },
+    { name = "EfinixClassicUIProbeB", label = "booleans", value = { a = true, b = false } },
+    { name = "EfinixClassicUIProbeN", label = "numbers", value = { a = 1, b = 2.5 } },
+    { name = "EfinixClassicUIProbeT", label = "nested", value = { a = { b = "y" } } },
+}
+local function readProbes()
+    local parts = {}
+    for _, probe in ipairs(PROBES) do
+        parts[#parts + 1] = probe.label .. "=" .. (type(_G[probe.name]) == "table" and "ok" or "-")
+    end
+    ns.probeReport = table.concat(parts, " ")
+end
+local function writeProbes()
+    for _, probe in ipairs(PROBES) do
+        _G[probe.name] = probe.value
+    end
+end
+
 ns.RegisterEvent("ADDON_LOADED", ns, function(_, _, loaded)
     if loaded ~= ADDON then
         return
     end
+    readProbes()
     ns.DB.Adopt("ADDON_LOADED")
     if not ns.db then
         ns.DB.Load()
@@ -229,11 +250,11 @@ ns.RegisterEvent("PLAYER_LOGIN", ns, function()
         if ns.DB.Adopt("PLAYER_ENTERING_WORLD") then
             ns.Print("saved settings arrived late, /reload once to apply them")
         end
-        -- the game had every chance to hand us the file; from here on our table is the saved one
-        ns.DB.Publish()
+        ns.DB.Flush()
+        writeProbes()
     end)
     ns.RegisterEvent("PLAYER_LOGOUT", ns, function()
-        ns.DB.Publish()
+        ns.DB.Flush()
     end)
     ns.RegisterEvent("PLAYER_ENTERING_WORLD", ns, function()
         ns.RefreshAll()
@@ -250,6 +271,7 @@ ns.RegisterEvent("PLAYER_LOGIN", ns, function()
             off[#off + 1] = name .. " (" .. ns.modules[name].state .. ")"
         end
     end
+    ns.Print("saved value types that load on this client: %s", tostring(ns.probeReport))
     ns.Print(
         "build %s loaded, settings from %s; parts off: %s; dark mode %s",
         ns.BUILD,
@@ -293,10 +315,11 @@ local function status()
         end
     end
     ns.Print(
-        "settings now: darkMode=%s Bags=%s (saved table intact=%s)",
+        "settings now: darkMode=%s Bags=%s (encoded %s chars, saved global=%s)",
         tostring(ns.db.darkMode),
         tostring(ns.db.modules.Bags),
-        tostring(ns.db == EfinixClassicUICharSettings)
+        tostring(ns.DB.flushed),
+        type(EfinixClassicUICharSettings)
     )
     local mediaCount = ns.Assets.MediaCount()
     if mediaCount > 0 then
@@ -382,6 +405,7 @@ SlashCmdList.FCUI = function(input)
         end
         rest = key
         ns.db.modules[rest] = (cmd == "enable")
+        ns.DB.Flush()
         -- run the lifecycle now so modules that changed a game setting can put it back
         if cmd == "disable" then
             ns.DisableModule(rest)
@@ -393,6 +417,7 @@ SlashCmdList.FCUI = function(input)
         local value = tonumber(rest)
         if value and value >= 0.5 and value <= 2 then
             ns.db.scale = value
+            ns.DB.Flush()
             ns.RefreshAll()
             ns.Print("scale set to %.2f", value)
         else
@@ -424,6 +449,7 @@ SlashCmdList.FCUI = function(input)
     elseif cmd == "dark" then
         if rest == "on" or rest == "off" then
             ns.Dark.Set(rest == "on")
+            ns.DB.Flush()
             ns.Print("dark mode %s", rest)
         else
             ns.Print("usage: /fcui dark on|off (currently %s)", ns.Dark.Enabled() and "on" or "off")
