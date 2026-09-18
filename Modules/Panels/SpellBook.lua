@@ -65,6 +65,8 @@ local function artAvailable()
 end
 
 local frame
+local toggleButton -- secure click handler that shows/hides the book, also in combat
+local pendingHandlers = {} -- secure buttons that asked for the toggle before the window existed
 local bookType = "spell" -- "spell" | "pet"
 local selectedLine = 1
 local pageNumbers = {} -- skill line index -> page (SPELLBOOK_PAGENUMBERS)
@@ -332,6 +334,9 @@ local function createSkillTab(parent, id)
     tab:SetHighlightTexture(tex("slotHighlight"), "ADD")
     tab:SetCheckedTexture(tex("checked"), "ADD")
     tab:SetScript("OnClick", function(self)
+        if InCombatLockdown() then
+            return -- the secure buttons cannot change spells in combat
+        end
         selectedLine = self:GetID()
         SB.Update()
     end)
@@ -363,6 +368,9 @@ local function createBookTab(parent, id)
         text:SetPoint("CENTER", tab, "CENTER", 0, 3)
     end
     tab:SetScript("OnClick", function(self)
+        if InCombatLockdown() then
+            return
+        end
         bookType = self.bookType or "spell"
         SB.Update()
         PlaySound(bookType == "pet" and SOUNDKIT.IG_ABILITY_OPEN or SOUNDKIT.IG_SPELLBOOK_OPEN)
@@ -373,8 +381,22 @@ end
 ---------------------------------------------------------------------------
 -- Window
 ---------------------------------------------------------------------------
+-- The window holds secure spell buttons, so in combat only secure code may
+-- show or hide it. The window is a secure handler itself: Escape is bound
+-- to the toggle button while it is open (instead of UISpecialFrames, whose
+-- CloseSpecialWindows would be blocked in combat), and the key binding and
+-- the micro button click both run the toggle's secure snippet.
+local TOGGLE_SNIPPET = [[
+    local book = self:GetFrameRef("book")
+    if book:IsShown() then
+        book:Hide()
+    else
+        book:Show()
+    end
+]]
+
 local function createFrame()
-    frame = CreateFrame("Frame", "FCUI_SpellBookFrame", UIParent)
+    frame = CreateFrame("Frame", "FCUI_SpellBookFrame", UIParent, "SecureHandlerShowHideTemplate")
     frame:SetSize(384, 512)
     frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
     frame:SetToplevel(true)
@@ -382,9 +404,24 @@ local function createFrame()
     frame:EnableMouse(true)
     frame:SetClampedToScreen(true)
     frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
+    frame:SetScript("OnDragStart", function(self)
+        if not InCombatLockdown() then
+            self:StartMoving()
+        end
+    end)
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     frame:Hide()
+    frame:SetAttribute("_onshow", [[ self:SetBindingClick(true, "ESCAPE", "FCUI_SpellBookToggle") ]])
+    frame:SetAttribute("_onhide", [[ self:ClearBindings() ]])
+
+    toggleButton = CreateFrame("Button", "FCUI_SpellBookToggle", UIParent, "SecureHandlerClickTemplate")
+    toggleButton:Hide()
+    toggleButton:SetFrameRef("book", frame)
+    toggleButton:SetAttribute("_onclick", TOGGLE_SNIPPET)
+    for _, handler in ipairs(pendingHandlers) do
+        SB.SecureToggle(handler)
+    end
+    pendingHandlers = {}
 
     local function panel(key, width, height, point)
         local t = frame:CreateTexture(nil, "BACKGROUND")
@@ -414,7 +451,7 @@ local function createFrame()
     close:SetPushedTexture(tex("closeDown"))
     close:SetHighlightTexture(tex("closeHighlight"), "ADD")
     close:SetScript("OnClick", function()
-        frame:Hide()
+        SB.Toggle()
     end)
 
     -- SpellButton1 at TOPLEFT 34,-85; ids 1-6 down the left column, 7-12 down the right
@@ -457,6 +494,9 @@ local function createFrame()
     frame.Prev:SetDisabledTexture(tex("prevDisabled"))
     frame.Prev:SetHighlightTexture(tex("mouseHighlight"), "ADD")
     frame.Prev:SetScript("OnClick", function()
+        if InCombatLockdown() then
+            return
+        end
         setPage(currentPage() - 1)
         SB.Update()
         PlaySound(SOUNDKIT.IG_ABILITY_PAGE_TURN)
@@ -473,6 +513,9 @@ local function createFrame()
     frame.Next:SetDisabledTexture(tex("nextDisabled"))
     frame.Next:SetHighlightTexture(tex("mouseHighlight"), "ADD")
     frame.Next:SetScript("OnClick", function()
+        if InCombatLockdown() then
+            return
+        end
         setPage(currentPage() + 1)
         SB.Update()
         PlaySound(SOUNDKIT.IG_ABILITY_PAGE_TURN)
@@ -487,26 +530,28 @@ local function createFrame()
             micro.UpdateOwnStates()
         end
     end
-    frame:SetScript("OnShow", function()
+    -- HookScript: the secure template owns OnShow/OnHide (they run the _onshow/_onhide snippets)
+    frame:HookScript("OnShow", function()
+        bookType = "spell"
         refreshLines()
         SB.Update()
         PlaySound(bookType == "pet" and SOUNDKIT.IG_ABILITY_OPEN or SOUNDKIT.IG_SPELLBOOK_OPEN)
         updateMicroButton()
     end)
-    frame:SetScript("OnHide", function()
+    frame:HookScript("OnHide", function()
         PlaySound(bookType == "pet" and SOUNDKIT.IG_ABILITY_CLOSE or SOUNDKIT.IG_SPELLBOOK_CLOSE)
         updateMicroButton()
     end)
-    table.insert(UISpecialFrames, "FCUI_SpellBookFrame")
 end
 
 ---------------------------------------------------------------------------
 -- Update (SpellBookFrame_Update 1.12)
 ---------------------------------------------------------------------------
 function SB.Update()
-    if not frame or not frame:IsShown() then
+    if not frame then
         return
     end
+    local locked = InCombatLockdown()
     if bookType == "pet" and #petSlots == 0 then
         bookType = "spell"
     end
@@ -517,6 +562,7 @@ function SB.Update()
             tab:SetNormalTexture(line.icon)
             tab.tooltip = line.name
             tab:SetChecked(selectedLine == id)
+            tab:SetEnabled(not locked or selectedLine == id)
             tab:Show()
         else
             tab:Hide()
@@ -527,11 +573,11 @@ function SB.Update()
     if #petSlots > 0 then
         tab1.bookType = "spell"
         tab1:SetText(SPELLBOOK or "Spellbook")
-        tab1:SetEnabled(bookType ~= "spell")
+        tab1:SetEnabled(bookType ~= "spell" and not locked)
         tab1:Show()
         tab2.bookType = "pet"
         tab2:SetText(petTitle or PET or "Pet")
-        tab2:SetEnabled(bookType ~= "pet")
+        tab2:SetEnabled(bookType ~= "pet" and not locked)
         tab2:Show()
     else
         tab1:Hide()
@@ -546,8 +592,8 @@ function SB.Update()
     end
     local pageNum = currentPage()
     frame.PageText:SetFormattedText(PAGE_NUMBER or "Page %d", pageNum)
-    frame.Prev:SetEnabled(pageNum > 1)
-    frame.Next:SetEnabled(pageNum < pages)
+    frame.Prev:SetEnabled(pageNum > 1 and not locked)
+    frame.Next:SetEnabled(pageNum < pages and not locked)
 
     Combat.Run("spellbook:buttons", function()
         for _, button in ipairs(frame.buttons) do
@@ -556,21 +602,11 @@ function SB.Update()
     end)
 end
 
-local function toggle()
-    if frame:IsShown() then
-        frame:Hide()
-    else
-        bookType = "spell"
-        frame:Show()
-    end
-end
-
 -- The spellbook key binding is redirected to our book with override bindings
 -- (out of combat only; existing overrides keep working in combat). This way
 -- Blizzard's PlayerSpellsFrame is never shown or hidden by our code, which
 -- keeps the UI panel manager free of taint. The micro button is ours as well
 -- (see ActionBars/MicroMenu.lua).
-local toggleButton
 local function updateBindings()
     if not toggleButton then
         return
@@ -600,19 +636,14 @@ function SB:Init()
 end
 
 function SB:Enable()
-    if not toggleButton then
-        toggleButton = CreateFrame("Button", "FCUI_SpellBookToggle", UIParent)
-        toggleButton:Hide()
-        toggleButton:SetScript("OnClick", toggle)
-    end
     updateBindings()
     ns.RegisterEvent("UPDATE_BINDINGS", self, updateBindings)
+    -- also while hidden: the secure buttons must carry their spells before combat starts
     local function refresh()
-        if frame:IsShown() then
-            refreshLines()
-            SB.Update()
-        end
+        refreshLines()
+        SB.Update()
     end
+    refresh()
     ns.RegisterEvent("SPELLS_CHANGED", self, refresh)
     ns.RegisterEvent("SPELL_TEXT_UPDATE", self, refresh)
     ns.RegisterEvent("PLAYER_ENTERING_WORLD", self, refresh)
@@ -643,7 +674,7 @@ end
 
 function SB:Disable()
     ns.UnregisterAllEvents(self)
-    if frame then
+    if frame and not InCombatLockdown() then
         frame:Hide()
     end
     if toggleButton and not InCombatLockdown() then
@@ -654,10 +685,35 @@ end
 
 function SB:Refresh() end
 
+-- Out of combat our code may show and hide the (protected) window itself. In
+-- combat only the secure toggle can, which the key binding and the micro
+-- button use directly; other callers get the game's own combat message.
 function SB.Toggle()
-    if frame then
-        toggle()
+    if not frame then
+        return
     end
+    if InCombatLockdown() then
+        UIErrorsFrame:AddMessage(ERR_NOT_IN_COMBAT or "You cannot do that while in combat", 1, 0.1, 0.1)
+        return
+    end
+    if frame:IsShown() then
+        frame:Hide()
+    else
+        frame:Show()
+    end
+end
+
+-- Attach the toggle snippet to another secure click handler (the micro button)
+function SB.SecureToggle(handler)
+    if not handler or not handler.SetFrameRef then
+        return
+    end
+    if not frame then
+        table.insert(pendingHandlers, handler) -- ActionBars enables before this module
+        return
+    end
+    handler:SetFrameRef("book", frame)
+    handler:SetAttribute("_onclick", TOGGLE_SNIPPET)
 end
 
 function SB.IsShown()

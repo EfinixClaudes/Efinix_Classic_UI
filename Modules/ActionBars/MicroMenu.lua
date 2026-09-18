@@ -222,12 +222,14 @@ local function tooltipText(label, binding)
     return label
 end
 
-local function createOwnButton(key, label, binding, onClick, isPushed)
-    local button = CreateFrame("Button", "FCUI_" .. key .. "MicroButton", AB.frame)
+local function createOwnButton(key, label, binding, onClick, isPushed, template)
+    local button = CreateFrame("Button", "FCUI_" .. key .. "MicroButton", AB.frame, template)
     button:SetSize(29, 58)
     button:SetHitRectInsets(0, 0, 18, 0)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    button:SetScript("OnClick", onClick)
+    if onClick then
+        button:SetScript("OnClick", onClick)
+    end
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(tooltipText(label, binding), 1, 1, 1)
@@ -249,17 +251,18 @@ end
 
 local function createOwnButtons()
     if not MicroMenu.own.Spellbook and ns.db.modules.SpellBook and ns.SpellBook then
+        -- secure click handler: the book can then be opened and closed in combat too
         local button = createOwnButton(
             "Spellbook",
             SPELLBOOK_ABILITIES_BUTTON or "Spellbook",
             "TOGGLESPELLBOOK",
-            function()
-                ns.SpellBook.Toggle()
-            end,
+            nil,
             function()
                 return ns.SpellBook.IsShown()
-            end
+            end,
+            "SecureHandlerClickTemplate"
         )
+        ns.SpellBook.SecureToggle(button)
         reskin(button, { asset = "Micro.Spellbook" })
         if not Assets.Get("Micro.Spellbook") then
             button:Hide()
@@ -314,14 +317,18 @@ function MicroMenu.Position()
         Raw.SetScale(MicroMenu.blizzardMenu, scale)
     end
     local previous
+    local locked = InCombatLockdown()
     for _, entry in ipairs(CLASSIC) do
         local button = entry.own and MicroMenu.own[entry.own] or _G[entry.frame]
         if button and Raw.IsShown(button) then
-            Raw.ClearAllPoints(button)
-            if previous then
-                Raw.SetPoint(button, "BOTTOMLEFT", previous, "BOTTOMRIGHT", -3, 0)
-            else
-                Raw.SetPoint(button, "BOTTOMLEFT", art, "BOTTOMLEFT", 552, 2)
+            -- our spellbook button is a secure handler: its anchors are left alone in combat
+            if not (locked and button:IsProtected()) then
+                Raw.ClearAllPoints(button)
+                if previous then
+                    Raw.SetPoint(button, "BOTTOMLEFT", previous, "BOTTOMRIGHT", -3, 0)
+                else
+                    Raw.SetPoint(button, "BOTTOMLEFT", art, "BOTTOMLEFT", 552, 2)
+                end
             end
             previous = button
         end

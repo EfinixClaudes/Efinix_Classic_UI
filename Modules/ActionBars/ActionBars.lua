@@ -105,6 +105,11 @@ function AB.Position()
     if positioning or not AB.frame then
         return
     end
+    -- the action bars are protected: anchoring them in combat is blocked, so wait for the lockdown to end
+    if InCombatLockdown() then
+        Combat.Queue("actionbars:position", AB.Position)
+        return
+    end
     positioning = true
 
     local art = AB.frame

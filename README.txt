@@ -76,7 +76,9 @@ buffs move left to make room.
 Raid frames: the modern compact raid frames are hidden. Use the raid tab of the
 social window and drag groups out of it, as in 2006.
 Spellbook: P (or the spellbook button in the micro menu) opens the old two-page
-book with the skill tabs on the right. Drag spells to your bars as usual.
+book with the skill tabs on the right. Drag spells to your bars as usual. It opens
+and closes in combat too, and Escape closes it; while you are in combat the page
+arrows and tabs are locked, as the game does not allow the buttons to change spells.
 Loot window: the small 2006 loot panel with four item slots and page arrows
 opens at the top left, or under the mouse if you have that option turned on.
 The options window (/fcui) lets you turn the spellbook and loot window off
