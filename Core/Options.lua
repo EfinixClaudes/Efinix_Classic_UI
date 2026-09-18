@@ -252,7 +252,6 @@ end
 
 -- Interface > AddOns entry: a small canvas with a button that opens our window
 function Options.RegisterSettings()
-    Options.CreateMinimapButton()
     if not Settings or not Settings.RegisterCanvasLayoutCategory then
         return
     end
