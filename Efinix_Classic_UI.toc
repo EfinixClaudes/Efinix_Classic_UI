@@ -3,7 +3,8 @@
 ## Notes: Restores the original 2004-2006 Vanilla interface on World of Warcraft: Forever.
 ## Author: Sebi
 ## Version: @project-version@
-## SavedVariables: ForeverClassicUIDB
+## SavedVariables: ForeverClassicUIDB, EfinixClassicUIProbe
+## SavedVariablesPerCharacter: EfinixClassicUICharProbe
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## X-Website: https://github.com/EfinixClaudes/Efinix_Classic_UI
 ## X-License: MIT
