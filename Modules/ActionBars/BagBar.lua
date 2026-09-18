@@ -180,16 +180,20 @@ function BagBar.Position()
     hideDividers(BagsBar)
 
     -- MainMenuBarBackpackButton: BOTTOMRIGHT of MainMenuBarArtFrame -6,2
-    Raw.ClearAllPoints(MainMenuBarBackpackButton)
-    Raw.SetPoint(MainMenuBarBackpackButton, "BOTTOMRIGHT", art, "BOTTOMRIGHT", -6, 2)
+    if AB.CanAnchor(MainMenuBarBackpackButton) then
+        Raw.ClearAllPoints(MainMenuBarBackpackButton)
+        Raw.SetPoint(MainMenuBarBackpackButton, "BOTTOMRIGHT", art, "BOTTOMRIGHT", -6, 2)
+    end
 
     -- CharacterBag0..3Slot: RIGHT to previous LEFT -5,0
     local previous = MainMenuBarBackpackButton
     for _, name in ipairs(BAG_NAMES) do
         local button = _G[name]
         if button and Raw.IsShown(button) then
-            Raw.ClearAllPoints(button)
-            Raw.SetPoint(button, "RIGHT", previous, "LEFT", -5, 0)
+            if AB.CanAnchor(button) then
+                Raw.ClearAllPoints(button)
+                Raw.SetPoint(button, "RIGHT", previous, "LEFT", -5, 0)
+            end
             previous = button
         end
     end
@@ -198,8 +202,10 @@ function BagBar.Position()
     local keyringShown = false
     if KeyRingButton and Raw.IsShown(KeyRingButton) then
         keyringShown = true
-        Raw.ClearAllPoints(KeyRingButton)
-        Raw.SetPoint(KeyRingButton, "RIGHT", previous, "LEFT", -5, 0)
+        if AB.CanAnchor(KeyRingButton) then
+            Raw.ClearAllPoints(KeyRingButton)
+            Raw.SetPoint(KeyRingButton, "RIGHT", previous, "LEFT", -5, 0)
+        end
     end
     updateKeyringArt(keyringShown)
 end

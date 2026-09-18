@@ -317,12 +317,11 @@ function MicroMenu.Position()
         Raw.SetScale(MicroMenu.blizzardMenu, scale)
     end
     local previous
-    local locked = InCombatLockdown()
     for _, entry in ipairs(CLASSIC) do
         local button = entry.own and MicroMenu.own[entry.own] or _G[entry.frame]
         if button and Raw.IsShown(button) then
             -- our spellbook button is a secure handler: its anchors are left alone in combat
-            if not (locked and button:IsProtected()) then
+            if AB.CanAnchor(button) then
                 Raw.ClearAllPoints(button)
                 if previous then
                     Raw.SetPoint(button, "BOTTOMLEFT", previous, "BOTTOMRIGHT", -3, 0)

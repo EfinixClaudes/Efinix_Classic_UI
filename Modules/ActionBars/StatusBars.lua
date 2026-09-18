@@ -307,7 +307,7 @@ function StatusBars.Position()
     local xp, rep = StatusBars.Slots()
 
     for _, container in ipairs(containers()) do
-        if container then
+        if AB.CanAnchor(container) then
             local deco = decorate(container)
             Raw.SetScale(container, scale)
             Raw.ClearAllPoints(container)

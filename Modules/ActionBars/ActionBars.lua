@@ -101,16 +101,29 @@ end
 -- is safe in combat; button sizes are handled in Buttons.lua via the queue.
 ---------------------------------------------------------------------------
 local positioning = false
+local anchorDeferred = false
+
+-- The bar containers (MainActionBar, MultiBar*, StanceBar, PetActionBar,
+-- status bar containers) are plain frames: Blizzard re-anchors them from its
+-- own Edit Mode layout during combat, and so may we. Only protected frames
+-- (secure buttons, our secure spellbook micro button) must wait; those are
+-- skipped in combat and the pass is repeated when the lockdown ends.
+function AB.CanAnchor(frame)
+    if not frame then
+        return false
+    end
+    if InCombatLockdown() and frame:IsProtected() then
+        anchorDeferred = true
+        return false
+    end
+    return true
+end
 function AB.Position()
     if positioning or not AB.frame then
         return
     end
-    -- the action bars are protected: anchoring them in combat is blocked, so wait for the lockdown to end
-    if InCombatLockdown() then
-        Combat.Queue("actionbars:position", AB.Position)
-        return
-    end
     positioning = true
+    anchorDeferred = false
 
     local art = AB.frame
     local scale = ns.db.scale or 1
@@ -119,7 +132,7 @@ function AB.Position()
     Raw.SetScale(art, scale)
 
     -- MainMenuBar.xml / ActionBarFrame.xml: ActionButton1 at BOTTOMLEFT of MainMenuBarArtFrame 8,4
-    if MainActionBar then
+    if AB.CanAnchor(MainActionBar) then
         Raw.SetScale(MainActionBar, scale)
         Raw.ClearAllPoints(MainActionBar)
         Raw.SetPoint(MainActionBar, "BOTTOMLEFT", art, "BOTTOMLEFT", 8, 4)
@@ -127,14 +140,14 @@ function AB.Position()
 
     -- MultiActionBars.xml: MultiBarBottomLeft BOTTOMLEFT to ActionButton1 TOPLEFT 0,17
     -- (UIParent.lua: baseY 17, reputation +9, maxLevel -5)
-    if MultiBarBottomLeft then
+    if AB.CanAnchor(MultiBarBottomLeft) then
         Raw.SetScale(MultiBarBottomLeft, scale)
         Raw.ClearAllPoints(MultiBarBottomLeft)
         Raw.SetPoint(MultiBarBottomLeft, "BOTTOMLEFT", art, "BOTTOMLEFT", 8, 4 + AB.BUTTON + 17 + yStatus)
     end
 
     -- MultiActionBars.xml: MultiBarBottomRight LEFT to MultiBarBottomLeft RIGHT 10,0
-    if MultiBarBottomRight and MultiBarBottomLeft then
+    if MultiBarBottomLeft and AB.CanAnchor(MultiBarBottomRight) then
         Raw.SetScale(MultiBarBottomRight, scale)
         Raw.ClearAllPoints(MultiBarBottomRight)
         Raw.SetPoint(MultiBarBottomRight, "LEFT", MultiBarBottomLeft, "RIGHT", 10, 0)
@@ -142,14 +155,14 @@ function AB.Position()
 
     -- MultiActionBars.xml: MultiBarRight (38x500, buttons from TOPRIGHT) at BOTTOMRIGHT -7,98,
     -- so the first button's top edge sits at 598 from the screen bottom.
-    if MultiBarRight then
+    if AB.CanAnchor(MultiBarRight) then
         Raw.SetScale(MultiBarRight, scale)
         Raw.ClearAllPoints(MultiBarRight)
         Raw.SetPoint(MultiBarRight, "TOPRIGHT", UIParent, "BOTTOMRIGHT", -7, 98 + 500)
     end
 
     -- MultiActionBars.xml: MultiBarLeft TOPRIGHT to MultiBarRight TOPLEFT -5,0
-    if MultiBarLeft and MultiBarRight then
+    if MultiBarRight and AB.CanAnchor(MultiBarLeft) then
         Raw.SetScale(MultiBarLeft, scale)
         Raw.ClearAllPoints(MultiBarLeft)
         Raw.SetPoint(MultiBarLeft, "TOPRIGHT", MultiBarRight, "TOPLEFT", -5, 0)
@@ -161,7 +174,7 @@ function AB.Position()
     if bottomLeftShown() then
         stanceY = stanceY + OFFSET_STANCE_BOTTOMLEFT
     end
-    if StanceBar then
+    if AB.CanAnchor(StanceBar) then
         Raw.SetScale(StanceBar, scale)
         Raw.ClearAllPoints(StanceBar)
         Raw.SetPoint(StanceBar, "BOTTOMLEFT", art, "BOTTOMLEFT", 30 + 11, stanceY)
@@ -183,7 +196,7 @@ function AB.Position()
             petX = (stanceRight - artLeft) / scale + 20
         end
     end
-    if PetActionBar then
+    if AB.CanAnchor(PetActionBar) then
         Raw.SetScale(PetActionBar, scale)
         Raw.ClearAllPoints(PetActionBar)
         Raw.SetPoint(PetActionBar, "BOTTOMLEFT", art, "BOTTOMLEFT", petX + 36, petY - 43 + 2)
@@ -208,6 +221,9 @@ function AB.Position()
     end
 
     positioning = false
+    if anchorDeferred then
+        Combat.Queue("actionbars:position", AB.Position)
+    end
 end
 
 ---------------------------------------------------------------------------
