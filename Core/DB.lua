@@ -197,9 +197,26 @@ function DB.Decode(text)
     return root
 end
 
+-- The per-character store only came back on this client while the addon
+-- also declared an account-wide SavedVariables entry (build .25 loaded, .26
+-- to .28 without the entry loaded nothing), so both are declared and both
+-- receive the encoded copy; whichever is present at login is used, the
+-- per-character one first.
+local function savedTable()
+    local char = EfinixClassicUICharSettings
+    if type(char) == "table" and (type(char.data) == "string" or type(char.modules) == "table") then
+        return char, "character"
+    end
+    local account = EfinixClassicUIAccountSettings
+    if type(account) == "table" and type(account.data) == "string" then
+        return account, "account"
+    end
+    return nil
+end
+
 -- Read the saved global if it holds settings we have not taken yet.
 function DB.Adopt(event)
-    local saved = EfinixClassicUICharSettings
+    local saved = savedTable()
     if type(saved) ~= "table" then
         DB.seen[event] = "none"
         return false
@@ -219,24 +236,31 @@ function DB.Flush()
     if not ns.db then
         return
     end
+    ns.db.logins = tonumber(ns.db.logins) or 0
     local data = DB.Encode(ns.db)
-    EfinixClassicUICharSettings = { data = data, build = tostring(ns.BUILD), length = tostring(#data) }
+    local stamp = { data = data, build = tostring(ns.BUILD), written = date("%H:%M:%S") }
+    EfinixClassicUICharSettings = stamp
+    EfinixClassicUIAccountSettings = { data = data, build = stamp.build, written = stamp.written }
     DB.flushed = #data
 end
 
 function DB.Load()
-    local saved = EfinixClassicUICharSettings
+    local saved, source = savedTable()
     local db
     if type(saved) == "table" and type(saved.data) == "string" then
         db = DB.Decode(saved.data)
         DB.loadedFromFile = true
+        DB.loadedSource = source
+        DB.loadedWritten = tostring(saved.written)
     elseif type(saved) == "table" and type(saved.modules) == "table" then
         db = saved -- a table from an earlier build, taken as is
         DB.loadedFromFile = true
+        DB.loadedSource = source
     else
         db = {}
         DB.loadedFromFile = false
     end
+    db.logins = (tonumber(db.logins) or 0) + 1
     local from = tonumber(db.version) or 0
     for v = from + 1, DEFAULTS.version do
         if migrations[v] then
@@ -263,6 +287,7 @@ end
 
 function DB.Reset()
     EfinixClassicUICharSettings = nil
+    EfinixClassicUIAccountSettings = nil
     DB.loadedFromFile = false
     DB.Load()
     DB.Flush()
