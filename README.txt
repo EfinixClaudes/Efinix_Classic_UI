@@ -48,7 +48,8 @@ COMMANDS  (type them in the chat box)
 /fcui dark on               dark mode: all frame art (bars, unit frames, minimap,
                             chat, tooltips, windows) and the game's own windows (quest,
                             gossip, vendor, character, mail, trainer, ...) tinted dark
-                            grey, black text on parchment turned light; "off" undoes it.
+                            grey; quest and book text get the game's dark "quest text
+                            contrast" background with light text; "off" undoes it.
                             Also a checkbox in the options window.
 /fcui disable Bags          turns a part off. Parts: ActionBars, UnitFrames, CastBar,
                             SwingTimer, Minimap, Auras, Chat, Tooltip, Nameplates,

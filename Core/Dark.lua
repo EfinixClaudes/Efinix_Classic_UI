@@ -242,9 +242,43 @@ function Dark.Apply()
     applyFonts()
 end
 
+---------------------------------------------------------------------------
+-- Quest, gossip and book text: Blizzard's own "quest text contrast"
+-- accessibility setting (questTextContrast cvar) has a level 4 that draws a
+-- dark background with light text through QuestTextContrast.lua, which is
+-- the real dark parchment. Dark mode switches to it and remembers the
+-- player's own value for when the mode is turned off.
+---------------------------------------------------------------------------
+local CONTRAST_CVAR = "questTextContrast"
+local CONTRAST_DARK = "4" -- QuestTextContrast.UseLightText: dark background, light text
+
+local function applyContrast()
+    if not C_CVar or not C_CVar.GetCVar or not C_CVar.SetCVar then
+        return
+    end
+    local current = C_CVar.GetCVar(CONTRAST_CVAR)
+    if current == nil then
+        return -- no such setting on this client
+    end
+    if Dark.Enabled() then
+        if current ~= CONTRAST_DARK then
+            if ns.db.darkContrastPrevious == nil then
+                ns.db.darkContrastPrevious = current
+            end
+            C_CVar.SetCVar(CONTRAST_CVAR, CONTRAST_DARK)
+        end
+    elseif ns.db.darkContrastPrevious ~= nil then
+        if current == CONTRAST_DARK then
+            C_CVar.SetCVar(CONTRAST_CVAR, tostring(ns.db.darkContrastPrevious))
+        end
+        ns.db.darkContrastPrevious = nil
+    end
+end
+
 function Dark.Set(enabled)
     ns.db.darkMode = enabled == true
     Dark.Apply()
+    applyContrast()
 end
 
 -- Panels that exist at login are walked once the settings are known; load-on-demand
@@ -252,6 +286,7 @@ end
 ns.RegisterEvent("PLAYER_LOGIN", Dark, function()
     skinPanels()
     applyFonts()
+    applyContrast()
 end)
 ns.RegisterEvent("ADDON_LOADED", Dark, function()
     if ns.db then

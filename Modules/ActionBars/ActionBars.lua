@@ -118,6 +118,48 @@ function AB.CanAnchor(frame)
     end
     return true
 end
+-- Blizzard re-anchors MainActionBar at every combat start and end
+-- (EditModeActionBar_OnEvent PLAYER_REGEN_* -> UpdateVisibility ->
+-- UpdateBottomActionBarPositions -> SetToLayoutAnchor): in Camelot the bar's
+-- layout anchor is BOTTOMRIGHT to MicroMenuContainer BOTTOMLEFT (-4.5, -4).
+-- In combat we may not anchor the bar back (its buttons are protected), so
+-- the container is placed where that anchor lands the bar exactly on its
+-- 1.12 spot and Blizzard's move becomes a no-op. Only while the bar is in
+-- its Edit Mode default position; a player-moved bar is never re-stacked.
+local MAIN_BAR_X, MAIN_BAR_Y = 8, 4 -- ActionButton1 at BOTTOMLEFT of MainMenuBarArtFrame 8,4
+function AB.AlignMicroMenuContainer()
+    local container, bar, art = MicroMenuContainer, MainActionBar, AB.frame
+    if not (container and bar and art) then
+        return
+    end
+    local point = MAIN_ACTION_BAR_POINT or "BOTTOMRIGHT"
+    local relativeTo = MAIN_ACTION_BAR_RELATIVE_TO or "MicroMenuContainer"
+    if point ~= "BOTTOMRIGHT" or relativeTo ~= "MicroMenuContainer" then
+        ns.Log("ActionBars", "main bar layout anchor %s/%s not handled", tostring(point), tostring(relativeTo))
+        return
+    end
+    if not AB.CanAnchor(container) then
+        return
+    end
+    local gapX = -(MAIN_ACTION_BAR_OFFSET_X or -4.5)
+    local gapY = -(MAIN_ACTION_BAR_OFFSET_Y or -4)
+    local artScale, containerScale = art:GetEffectiveScale(), container:GetEffectiveScale()
+    if not artScale or not containerScale or containerScale == 0 then
+        return
+    end
+    -- offsets are in the anchored frame's scale; the bar shares the art's scale
+    local ratio = artScale / containerScale
+    Raw.ClearAllPoints(container)
+    Raw.SetPoint(
+        container,
+        "BOTTOMLEFT",
+        art,
+        "BOTTOMLEFT",
+        (MAIN_BAR_X + bar:GetWidth() + gapX) * ratio,
+        (MAIN_BAR_Y + gapY) * ratio
+    )
+end
+
 function AB.Position()
     if positioning or not AB.frame then
         return
@@ -135,7 +177,7 @@ function AB.Position()
     if AB.CanAnchor(MainActionBar) then
         Raw.SetScale(MainActionBar, scale)
         Raw.ClearAllPoints(MainActionBar)
-        Raw.SetPoint(MainActionBar, "BOTTOMLEFT", art, "BOTTOMLEFT", 8, 4)
+        Raw.SetPoint(MainActionBar, "BOTTOMLEFT", art, "BOTTOMLEFT", MAIN_BAR_X, MAIN_BAR_Y)
     end
 
     -- MultiActionBars.xml: MultiBarBottomLeft BOTTOMLEFT to ActionButton1 TOPLEFT 0,17
@@ -209,6 +251,7 @@ function AB.Position()
     if AB.MicroMenu then
         AB.MicroMenu.Position()
     end
+    AB.AlignMicroMenuContainer()
     if AB.BagBar then
         AB.BagBar.Position()
     end
@@ -410,10 +453,17 @@ end
 
 function AB:Diag()
     ns.Print("art frame shown=%s scale=%.2f", tostring(AB.frame and AB.frame:IsShown()), ns.db.scale or 1)
+    local frames = {}
     for _, bar in ipairs(self.bars or {}) do
+        frames[#frames + 1] = bar
+    end
+    frames[#frames + 1] = MicroMenuContainer
+    for _, bar in ipairs(frames) do
         local point, relativeTo, relativePoint, x, y = bar:GetPoint(1)
+        local protected = bar:IsProtected()
+        local ok, default = pcall(bar.IsInDefaultPosition, bar)
         ns.Print(
-            "  %-20s shown=%s %s -> %s %s (%.1f, %.1f) size %.0fx%.0f",
+            "  %-20s shown=%s %s -> %s %s (%.1f, %.1f) size %.0fx%.0f protected=%s default=%s",
             bar:GetName(),
             tostring(shown(bar)),
             tostring(point),
@@ -422,7 +472,9 @@ function AB:Diag()
             x or 0,
             y or 0,
             bar:GetWidth(),
-            bar:GetHeight()
+            bar:GetHeight(),
+            tostring(protected),
+            ok and tostring(default) or "?"
         )
     end
     -- micro buttons: the modern group's art sizes, for "icon too big" reports

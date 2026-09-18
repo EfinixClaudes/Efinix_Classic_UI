@@ -7,6 +7,7 @@ local DEFAULTS = {
     version = 4,
     scale = 1,
     darkMode = false, -- frame art tinted dark grey (addon option)
+    darkContrastPrevious = nil, -- questTextContrast cvar before dark mode set it to 4
     modules = {
         ActionBars = true,
         UnitFrames = true,
