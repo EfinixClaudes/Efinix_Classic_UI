@@ -10,8 +10,9 @@ the carved main bar with gryphons, the small 36 px action buttons, the purple XP
 the old micro menu and bag buttons, the old player/target/pet/party frames, the
 thin yellow cast bar, the round minimap with its sun/moon icon, buffs and debuffs
 in the top right corner, the old chat frame with its scroll buttons, the dark blue
-tooltips, the classic nameplates, a classic-styled all-in-one bag window and
-unit frames you can drag wherever you like.
+tooltips, the classic nameplates, the old spellbook and loot window, a weapon swing
+timer, a classic-styled all-in-one bag window and unit frames you can drag wherever
+you like.
 
 
 INSTALL
@@ -46,7 +47,7 @@ COMMANDS  (type them in the chat box)
 /fcui scale 1.1             makes the whole bottom bar bigger or smaller (0.5-2.0)
 /fcui disable Bags          turns a part off. Parts: ActionBars, UnitFrames, CastBar,
                             SwingTimer, Minimap, Auras, Chat, Tooltip, Nameplates,
-                            RaidFrames, Bags.
+                            RaidFrames, LootFrame, SpellBook, Bags.
 /fcui enable Bags           turns it on again. Both need /reload afterwards.
 /fcui reset                 forgets all settings, then /reload
 
@@ -74,6 +75,12 @@ Minimap: "Minimap size" in the options scales the whole minimap cluster; the
 buffs move left to make room.
 Raid frames: the modern compact raid frames are hidden. Use the raid tab of the
 social window and drag groups out of it, as in 2006.
+Spellbook: P (or the spellbook button in the micro menu) opens the old two-page
+book with the skill tabs on the right. Drag spells to your bars as usual.
+Loot window: the small 2006 loot panel with four item slots and page arrows
+opens at the top left, or under the mouse if you have that option turned on.
+The options window (/fcui) lets you turn the spellbook and loot window off
+if you prefer the game's own versions.
 Edit Mode still works for things the addon does not manage; positions and sizes
 of the frames listed above are set by the addon, except the chat frame and the
 tooltip, which keep a position you gave them in Edit Mode.
