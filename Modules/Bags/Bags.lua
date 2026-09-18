@@ -85,6 +85,36 @@ local function bagIDsFor(kind)
     return inventoryBagIDs()
 end
 
+-- The keyring container reports its full capacity, but Blizzard's own bag
+-- (MainMenuBarBagButtons.lua GetKeyRingSize) only shows the rows that hold
+-- keys, rounded up to a multiple of four. Same rule here so the window does
+-- not fill with empty key slots.
+local function keyRingSize()
+    local capacity = C_Container.GetContainerNumSlots(KEYRING) or 0
+    local lastFilled, numItems = 0, 0
+    for slot = 1, capacity do
+        if C_Container.GetContainerItemInfo(KEYRING, slot) then
+            lastFilled = slot
+            numItems = numItems + 1
+        end
+    end
+    local remainder = lastFilled % 4
+    local size
+    if remainder == 0 and numItems < lastFilled then
+        size = lastFilled
+    else
+        size = lastFilled + (4 - remainder)
+    end
+    return math.min(size, capacity)
+end
+
+local function numSlotsFor(bagID)
+    if bagID == KEYRING then
+        return keyRingSize()
+    end
+    return C_Container.GetContainerNumSlots(bagID) or 0
+end
+
 local function settings()
     return ns.db.bags
 end
@@ -323,9 +353,11 @@ local function getToggle(window, index)
             0.8
         )
         GameTooltip:Show()
+        Bags.HighlightBag(window.kind, self.bagID, true)
     end)
-    toggle:SetScript("OnLeave", function()
+    toggle:SetScript("OnLeave", function(self)
         GameTooltip:Hide()
+        Bags.HighlightBag(window.kind, self.bagID, false)
     end)
     window.toggles[index] = toggle
     return toggle
@@ -374,7 +406,7 @@ function Bags.RefreshWindow(kind, relayout)
     local seen = {}
     for _, bagID in ipairs(bagIDs) do
         seen[bagID] = true
-        local numSlots = C_Container.GetContainerNumSlots(bagID) or 0
+        local numSlots = numSlotsFor(bagID)
         local holder = window.holders[bagID]
         if isBagHidden(kind, bagID) or numSlots == 0 then
             if holder then
@@ -416,6 +448,27 @@ function Bags.RefreshWindow(kind, relayout)
     end
     if relayout and window.Search then
         window.Search:ClearFocus()
+    end
+end
+
+-- Light up every slot that belongs to one bag while its icon is hovered
+-- (the bag toggle in the window or a bag button on the main bar). Uses the
+-- item buttons' own highlight texture (ButtonHilight-Square), so it looks
+-- like the mouse-over glow Vanilla slots had.
+function Bags.HighlightBag(kind, bagID, on)
+    local window = Bags.windows[kind]
+    local holder = window and window.holders[bagID]
+    if not holder or not holder:IsShown() then
+        return
+    end
+    for _, button in ipairs(holder.buttons) do
+        if button:IsShown() then
+            if on then
+                button:LockHighlight()
+            else
+                button:UnlockHighlight()
+            end
+        end
     end
 end
 
@@ -640,9 +693,35 @@ function Bags:Init()
     Bags.windows.bank = createWindow("bank", BANK or "Bank")
 end
 
+-- Main bar bag buttons (MainMenuBarBagButtons.xml): hovering one lights up its slots
+local BAG_BAR_BUTTONS = {
+    { name = "MainMenuBarBackpackButton", bagID = BACKPACK },
+    { name = "CharacterBag0Slot", bagID = 1 },
+    { name = "CharacterBag1Slot", bagID = 2 },
+    { name = "CharacterBag2Slot", bagID = 3 },
+    { name = "CharacterBag3Slot", bagID = 4 },
+    { name = "CharacterReagentBag0Slot", bagID = REAGENT_BAG },
+    { name = "KeyRingButton", bagID = KEYRING },
+}
+
+local function hookBagBarHighlights()
+    for _, entry in ipairs(BAG_BAR_BUTTONS) do
+        local button = _G[entry.name]
+        if button and button.HookScript then
+            button:HookScript("OnEnter", function()
+                Bags.HighlightBag("inventory", entry.bagID, true)
+            end)
+            button:HookScript("OnLeave", function()
+                Bags.HighlightBag("inventory", entry.bagID, false)
+            end)
+        end
+    end
+end
+
 function Bags:Enable()
     Bags.Blizzard.Enable()
     Bags.Junk.Enable()
+    hookBagBarHighlights()
 
     ns.RegisterEvent("BAG_UPDATE", self, function(_, _, bagID)
         Bags.UpdateBag("inventory", bagID)
