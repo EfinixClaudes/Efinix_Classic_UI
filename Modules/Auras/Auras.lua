@@ -14,6 +14,11 @@ local _, ns = ...
 --
 -- Nothing here reads aura data. Blizzard fills the buttons (secret-value
 -- safe); we only touch textures, colours and anchors of unprotected frames.
+-- The debuff border colour is the one place that depends on aura data: the
+-- dispel type is a secret string on this client, so it is never looked at.
+-- Blizzard's sanctioned route is a colour curve keyed by dispel type ID,
+-- evaluated by C_UnitAuras.GetAuraDispelTypeColor, whose (secret) result goes
+-- straight into SetVertexColor.
 local Raw = ns.Raw
 
 local Auras = ns.RegisterModule("Auras", {})
@@ -27,6 +32,16 @@ local DEBUFF_COLORS = {
     Disease = { 0.60, 0.40, 0 },
     Poison = { 0.00, 0.60, 0 },
 }
+-- SpellDispelType IDs (the "x" of the dispel colour curve): 0 none, 1 Magic,
+-- 2 Curse, 3 Disease, 4 Poison; 5-11 (stealth, invisibility, enrage, ...) had
+-- no colour of their own in 1.12 and get the plain red frame.
+local DISPEL_ID_COLORS = {
+    [1] = DEBUFF_COLORS.Magic,
+    [2] = DEBUFF_COLORS.Curse,
+    [3] = DEBUFF_COLORS.Disease,
+    [4] = DEBUFF_COLORS.Poison,
+}
+local MAX_DISPEL_ID = 11
 
 -- BuffFrame.xml 1.12: TemporaryEnchantFrame TOPRIGHT -175,-13; first enchant at its TOPRIGHT.
 local BUFFS_X, BUFFS_Y = -175, -13
@@ -53,18 +68,60 @@ end
 -- Debuff border: UI-Debuff-Overlays 33x32, coords 0.296875,0.5703125,0,0.515625,
 -- vertex colour by dispel type (BuffButtonHarmful 1.12 + BuffButton_Update).
 ---------------------------------------------------------------------------
-local function styleDebuffBorder(border, dispelType)
+local dispelCurve -- LuaColorCurveObject, false when the client lacks the API
+local function dispelColorCurve()
+    if dispelCurve ~= nil then
+        return dispelCurve
+    end
+    local canCurve = C_CurveUtil
+        and C_CurveUtil.CreateColorCurve
+        and C_UnitAuras
+        and C_UnitAuras.GetAuraDispelTypeColor
+        and CreateColor
+    if not canCurve then
+        dispelCurve = false
+        ns.Log("Auras", "no dispel colour curve API, debuff borders stay red")
+        return false
+    end
+    local curve = C_CurveUtil.CreateColorCurve()
+    if curve.SetType and Enum and Enum.LuaCurveType and Enum.LuaCurveType.Step then
+        curve:SetType(Enum.LuaCurveType.Step) -- snap to the ID, no blending between types
+    end
+    for id = 0, MAX_DISPEL_ID do
+        local color = DISPEL_ID_COLORS[id] or DEBUFF_COLORS.none
+        curve:AddPoint(id, CreateColor(color[1], color[2], color[3], 1))
+    end
+    dispelCurve = curve
+    return curve
+end
+
+local ourBorders = setmetatable({}, { __mode = "k" }) -- DebuffBorder texture -> aura button
+
+-- The dispel type argument Blizzard passes is secret and is never read here.
+local function styleDebuffBorder(border)
     local tex = ns.Assets.Get("Auras.DebuffOverlay")
     if not border or not tex then
         return
     end
     border:SetTexture(tex)
     border:SetTexCoord(0.296875, 0.5703125, 0, 0.515625)
-    local color = DEBUFF_COLORS[dispelType] or DEBUFF_COLORS.none
-    border:SetVertexColor(color[1], color[2], color[3])
+    local button = ourBorders[border]
+    local info = button and button.buttonInfo
+    local curve = dispelColorCurve()
+    local ok, color = false, nil
+    if curve and info then
+        -- auraInstanceID may itself be secret; the API takes it as is, so it is
+        -- passed through untested and a rejected call falls back to red
+        local unit = (PlayerFrame and PlayerFrame.unit) or "player"
+        ok, color = pcall(C_UnitAuras.GetAuraDispelTypeColor, unit, info.auraInstanceID, curve)
+    end
+    if ok and color and color.GetRGBA then
+        border:SetVertexColor(color:GetRGBA())
+    else
+        local none = DEBUFF_COLORS.none
+        border:SetVertexColor(none[1], none[2], none[3])
+    end
 end
-
-local ourBorders = setmetatable({}, { __mode = "k" }) -- DebuffBorder texture -> aura button
 
 local function styleButton(button)
     if hooked[button] then
@@ -159,9 +216,9 @@ function Auras:Enable()
 
     -- Debuff border art: Blizzard sets an atlas per dispel type; we replace it afterwards.
     if AuraUtil and type(AuraUtil.SetAuraBorderAtlas) == "function" then
-        hooksecurefunc(AuraUtil, "SetAuraBorderAtlas", function(border, dispelType)
+        hooksecurefunc(AuraUtil, "SetAuraBorderAtlas", function(border)
             if ourBorders[border] then
-                styleDebuffBorder(border, dispelType)
+                styleDebuffBorder(border)
             end
         end)
     end
