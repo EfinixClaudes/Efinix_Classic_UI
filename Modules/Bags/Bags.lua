@@ -720,7 +720,6 @@ end
 
 function Bags:Enable()
     Bags.Blizzard.Enable()
-    Bags.Junk.Enable()
     hookBagBarHighlights()
 
     ns.RegisterEvent("BAG_UPDATE", self, function(_, _, bagID)

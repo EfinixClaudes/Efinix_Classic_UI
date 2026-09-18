@@ -22,6 +22,7 @@ local DEFAULTS = {
         LootFrame = true,
         SpellBook = true,
         Bags = true,
+        Vendor = true,
     },
     -- Nameplates: plate scale and the player's cvar values before we changed them (name -> value)
     nameplates = { scale = 1.3, previous = {} },

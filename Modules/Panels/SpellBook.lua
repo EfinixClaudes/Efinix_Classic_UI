@@ -65,8 +65,8 @@ local function artAvailable()
 end
 
 local frame
-local toggleButton -- secure click handler that shows/hides the book, also in combat
-local pendingHandlers = {} -- secure buttons that asked for the toggle before the window existed
+local toggleButton -- hidden button the spellbook key binding is redirected to
+local overlay -- the secure cast buttons, a separate frame under UIParent (see the Window section)
 local bookType = "spell" -- "spell" | "pet"
 local selectedLine = 1
 local pageNumbers = {} -- skill line index -> page (SPELLBOOK_PAGENUMBERS)
@@ -165,6 +165,8 @@ local function updateButton(button)
         button:SetChecked(false)
         button:GetNormalTexture():SetVertexColor(1, 1, 1)
         button:Disable()
+        button.spellID = nil
+        button.isPassive = nil
         return
     end
     button:Enable()
@@ -173,6 +175,7 @@ local function updateButton(button)
         return
     end
     button.spellID = info.spellID
+    button.isPassive = info.isPassive
 
     button.Icon:SetTexture(info.iconID)
     button.Icon:Show()
@@ -230,30 +233,59 @@ local function updateButton(button)
     local current = info.spellID and IsCurrentSpell and IsCurrentSpell(info.spellID)
     button:SetChecked(current == true)
 
-    -- secure click: cast the spell; shift is left to our OnClick hook (pickup)
-    if not InCombatLockdown() then
-        if info.spellID and not info.isPassive then
-            button:SetAttribute("type1", "spell")
-            button:SetAttribute("spell", info.spellID)
-        else
-            button:SetAttribute("type1", nil)
-            button:SetAttribute("spell", nil)
-        end
-    end
-
-    if GameTooltip:IsOwned(button) then
+    if GameTooltip:IsOwned(button) or (button.secure and GameTooltip:IsOwned(button.secure)) then
         button:GetScript("OnEnter")(button)
     end
 end
 
+-- The secure cast button over a slot: plain left click casts. Attributes can
+-- only change out of combat; in combat the overlay is hidden anyway.
+local function updateAttributes(button)
+    local secure = button.secure
+    if not secure or InCombatLockdown() then
+        return
+    end
+    if button.slot and button.spellID and not button.isPassive then
+        secure:SetAttribute("type1", "spell")
+        secure:SetAttribute("spell", button.spellID)
+    else
+        secure:SetAttribute("type1", nil)
+        secure:SetAttribute("spell", nil)
+    end
+end
+
+local function onSpellClick(button, mouseButton)
+    if not button.slot then
+        return
+    end
+    if IsModifiedClick("PICKUPACTION") then
+        C_SpellBook.PickupSpellBookItem(button.slot, button.bank)
+    elseif mouseButton ~= "LeftButton" and button.bank == petBank() then
+        C_SpellBook.ToggleSpellBookItemAutoCast(button.slot, button.bank)
+        updateButton(button)
+    end
+    button:SetChecked(button.spellID and IsCurrentSpell and IsCurrentSpell(button.spellID) == true)
+end
+
+local function onSpellEnter(button)
+    if not button.slot then
+        return
+    end
+    GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+    GameTooltip:SetSpellBookItem(button.slot, button.bank)
+    GameTooltip:Show()
+end
+
+local function onSpellLeave()
+    GameTooltip:Hide()
+end
+
 local function createSpellButton(parent, id)
-    local button = CreateFrame("CheckButton", "FCUI_SpellButton" .. id, parent, "SecureActionButtonTemplate")
+    local button = CreateFrame("CheckButton", "FCUI_SpellButton" .. id, parent)
     button:SetSize(37, 37)
     button:SetID(id)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
-    button:SetAttribute("shift-type1", "none")
-    button:SetAttribute("type2", "none")
 
     -- SpellButtonTemplate 1.12
     button.Background = button:CreateTexture(nil, "BACKGROUND")
@@ -288,36 +320,48 @@ local function createSpellButton(parent, id)
     button:SetHighlightTexture(tex("slotHighlight"), "ADD")
     button:SetCheckedTexture(tex("checked"), "ADD")
 
-    -- the secure template casts on plain left click; everything else is ours
-    button:HookScript("OnClick", function(self, mouseButton)
-        if not self.slot then
-            return
-        end
-        if IsModifiedClick("PICKUPACTION") then
-            C_SpellBook.PickupSpellBookItem(self.slot, self.bank)
-        elseif mouseButton ~= "LeftButton" and self.bank == petBank() then
-            C_SpellBook.ToggleSpellBookItemAutoCast(self.slot, self.bank)
-            updateButton(self)
-        end
-        self:SetChecked(self.spellID and IsCurrentSpell and IsCurrentSpell(self.spellID) == true)
-    end)
+    -- pickup on shift-click, pet autocast on right click; a plain left click
+    -- casts through the secure cast button that sits over this one out of combat
+    button:SetScript("OnClick", onSpellClick)
     button:SetScript("OnDragStart", function(self)
         if self.slot then
             C_SpellBook.PickupSpellBookItem(self.slot, self.bank)
         end
     end)
-    button:SetScript("OnEnter", function(self)
-        if not self.slot then
-            return
-        end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetSpellBookItem(self.slot, self.bank)
-        GameTooltip:Show()
-    end)
-    button:SetScript("OnLeave", function()
-        GameTooltip:Hide()
-    end)
+    button:SetScript("OnEnter", onSpellEnter)
+    button:SetScript("OnLeave", onSpellLeave)
     return button
+end
+
+-- Secure cast button over a visible slot button. It lives in the overlay
+-- (parent UIParent), never anchored to the book, so the book itself stays an
+-- ordinary frame that can be shown and hidden in combat.
+local function createCastButton(parent, visible)
+    local secure =
+        CreateFrame("Button", "FCUI_SpellCastButton" .. visible:GetID(), parent, "SecureActionButtonTemplate")
+    secure:SetSize(37, 37)
+    secure:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    secure:RegisterForDrag("LeftButton")
+    secure:SetAttribute("shift-type1", "none")
+    secure:SetAttribute("type2", "none")
+    secure:SetHighlightTexture(tex("slotHighlight"), "ADD")
+    secure:SetPushedTexture(tex("slotPushed"))
+    secure.visible = visible
+    visible.secure = secure
+    -- everything but the plain left click is handled like on the visible button
+    secure:HookScript("OnClick", function(self, mouseButton)
+        onSpellClick(self.visible, mouseButton)
+    end)
+    secure:SetScript("OnDragStart", function(self)
+        if self.visible.slot then
+            C_SpellBook.PickupSpellBookItem(self.visible.slot, self.visible.bank)
+        end
+    end)
+    secure:SetScript("OnEnter", function(self)
+        onSpellEnter(self.visible)
+    end)
+    secure:SetScript("OnLeave", onSpellLeave)
+    return secure
 end
 
 ---------------------------------------------------------------------------
@@ -334,9 +378,6 @@ local function createSkillTab(parent, id)
     tab:SetHighlightTexture(tex("slotHighlight"), "ADD")
     tab:SetCheckedTexture(tex("checked"), "ADD")
     tab:SetScript("OnClick", function(self)
-        if InCombatLockdown() then
-            return -- the secure buttons cannot change spells in combat
-        end
         selectedLine = self:GetID()
         SB.Update()
     end)
@@ -368,9 +409,6 @@ local function createBookTab(parent, id)
         text:SetPoint("CENTER", tab, "CENTER", 0, 3)
     end
     tab:SetScript("OnClick", function(self)
-        if InCombatLockdown() then
-            return
-        end
         bookType = self.bookType or "spell"
         SB.Update()
         PlaySound(bookType == "pet" and SOUNDKIT.IG_ABILITY_OPEN or SOUNDKIT.IG_SPELLBOOK_OPEN)
@@ -381,22 +419,21 @@ end
 ---------------------------------------------------------------------------
 -- Window
 ---------------------------------------------------------------------------
--- The window holds secure spell buttons, so in combat only secure code may
--- show or hide it. The window is a secure handler itself: Escape is bound
--- to the toggle button while it is open (instead of UISpecialFrames, whose
--- CloseSpecialWindows would be blocked in combat), and the key binding and
--- the micro button click both run the toggle's secure snippet.
-local TOGGLE_SNIPPET = [[
-    local book = self:GetFrameRef("book")
-    if book:IsShown() then
-        book:Hide()
-    else
-        book:Show()
-    end
-]]
+-- Combat. A frame that protected frames hang off (children or anchors) is
+-- itself protected, and insecure code may not show, hide or move it in
+-- combat. Forever's secure snippet environment is also broken on this game
+-- type (loadstring_untainted is nil when RestrictedExecution loads), so
+-- nothing here uses secure handlers. Instead the book is an ordinary frame
+-- with ordinary slot buttons, and the secure cast buttons live in a separate
+-- overlay under UIParent that is positioned by numbers, never anchored to
+-- the book. Out of combat the overlay follows the book (shown, hidden,
+-- moved by our code). A visibility state driver hides it for the duration of
+-- combat, so the book can open and close freely in a fight: view, tooltips
+-- and drag work, click-to-cast waits for the fight to end.
+local OVERLAY_DRIVER = "[combat] hide; show"
 
 local function createFrame()
-    frame = CreateFrame("Frame", "FCUI_SpellBookFrame", UIParent, "SecureHandlerShowHideTemplate")
+    frame = CreateFrame("Frame", "FCUI_SpellBookFrame", UIParent)
     frame:SetSize(384, 512)
     frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
     frame:SetToplevel(true)
@@ -405,23 +442,28 @@ local function createFrame()
     frame:SetClampedToScreen(true)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", function(self)
+        -- the overlay cannot follow in combat (it is protected)
         if not InCombatLockdown() then
             self:StartMoving()
         end
     end)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+    frame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        SB.SyncOverlay()
+    end)
     frame:Hide()
-    frame:SetAttribute("_onshow", [[ self:SetBindingClick(true, "ESCAPE", "FCUI_SpellBookToggle") ]])
-    frame:SetAttribute("_onhide", [[ self:ClearBindings() ]])
 
-    toggleButton = CreateFrame("Button", "FCUI_SpellBookToggle", UIParent, "SecureHandlerClickTemplate")
+    toggleButton = CreateFrame("Button", "FCUI_SpellBookToggle", UIParent)
     toggleButton:Hide()
-    toggleButton:SetFrameRef("book", frame)
-    toggleButton:SetAttribute("_onclick", TOGGLE_SNIPPET)
-    for _, handler in ipairs(pendingHandlers) do
-        SB.SecureToggle(handler)
-    end
-    pendingHandlers = {}
+    toggleButton:SetScript("OnClick", function()
+        SB.Toggle()
+    end)
+
+    overlay = CreateFrame("Frame", "FCUI_SpellBookCastOverlay", UIParent)
+    overlay:SetSize(384, 512)
+    overlay:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, -104)
+    overlay:SetFrameStrata("HIGH") -- above the (toplevel, MEDIUM) book
+    overlay:Hide()
 
     local function panel(key, width, height, point)
         local t = frame:CreateTexture(nil, "BACKGROUND")
@@ -461,8 +503,12 @@ local function createFrame()
         local button = createSpellButton(frame, id)
         local column = id > 6 and 1 or 0
         local row = (id - 1) % 6
-        button:SetPoint("TOPLEFT", frame, "TOPLEFT", 34 + column * COLUMN_OFFSET, -85 - row * (37 + ROW_GAP))
+        local x, y = 34 + column * COLUMN_OFFSET, -85 - row * (37 + ROW_GAP)
+        button:SetPoint("TOPLEFT", frame, "TOPLEFT", x, y)
         frame.buttons[id] = button
+        -- same spot inside the overlay, which mirrors the book's size and position
+        local secure = createCastButton(overlay, button)
+        secure:SetPoint("TOPLEFT", overlay, "TOPLEFT", x, y)
     end
 
     frame.skillTabs = {}
@@ -495,9 +541,6 @@ local function createFrame()
     frame.Prev:SetDisabledTexture(tex("prevDisabled"))
     frame.Prev:SetHighlightTexture(tex("mouseHighlight"), "ADD")
     frame.Prev:SetScript("OnClick", function()
-        if InCombatLockdown() then
-            return
-        end
         setPage(currentPage() - 1)
         SB.Update()
         PlaySound(SOUNDKIT.IG_ABILITY_PAGE_TURN)
@@ -514,9 +557,6 @@ local function createFrame()
     frame.Next:SetDisabledTexture(tex("nextDisabled"))
     frame.Next:SetHighlightTexture(tex("mouseHighlight"), "ADD")
     frame.Next:SetScript("OnClick", function()
-        if InCombatLockdown() then
-            return
-        end
         setPage(currentPage() + 1)
         SB.Update()
         PlaySound(SOUNDKIT.IG_ABILITY_PAGE_TURN)
@@ -531,17 +571,43 @@ local function createFrame()
             micro.UpdateOwnStates()
         end
     end
-    -- HookScript: the secure template owns OnShow/OnHide (they run the _onshow/_onhide snippets)
-    frame:HookScript("OnShow", function()
+    frame:SetScript("OnShow", function()
         bookType = "spell"
         refreshLines()
         SB.Update()
         PlaySound(bookType == "pet" and SOUNDKIT.IG_ABILITY_OPEN or SOUNDKIT.IG_SPELLBOOK_OPEN)
         updateMicroButton()
+        SB.SyncOverlay()
     end)
-    frame:HookScript("OnHide", function()
+    frame:SetScript("OnHide", function()
         PlaySound(bookType == "pet" and SOUNDKIT.IG_ABILITY_CLOSE or SOUNDKIT.IG_SPELLBOOK_CLOSE)
         updateMicroButton()
+        SB.SyncOverlay()
+    end)
+    -- Escape closes the book; CloseSpecialWindows may hide it in combat, it is an ordinary frame
+    table.insert(UISpecialFrames, "FCUI_SpellBookFrame")
+end
+
+-- Overlay follows the book: shown and placed over it while the book is open
+-- (out of combat), hidden while it is closed. In combat the state driver owns
+-- its visibility and this call is queued for the end of the fight.
+function SB.SyncOverlay()
+    if not overlay or not frame then
+        return
+    end
+    Combat.Run("spellbook:overlay", function()
+        if frame:IsShown() then
+            local left, bottom = frame:GetLeft(), frame:GetBottom()
+            if left and bottom then
+                overlay:ClearAllPoints()
+                overlay:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, bottom)
+            end
+            overlay:Show()
+            RegisterStateDriver(overlay, "visibility", OVERLAY_DRIVER)
+        else
+            UnregisterStateDriver(overlay, "visibility")
+            overlay:Hide()
+        end
     end)
 end
 
@@ -552,7 +618,6 @@ function SB.Update()
     if not frame then
         return
     end
-    local locked = InCombatLockdown()
     if bookType == "pet" and #petSlots == 0 then
         bookType = "spell"
     end
@@ -563,7 +628,7 @@ function SB.Update()
             tab:SetNormalTexture(line.icon)
             tab.tooltip = line.name
             tab:SetChecked(selectedLine == id)
-            tab:SetEnabled(not locked or selectedLine == id)
+            tab:SetEnabled(true)
             tab:Show()
         else
             tab:Hide()
@@ -574,11 +639,11 @@ function SB.Update()
     if #petSlots > 0 then
         tab1.bookType = "spell"
         tab1:SetText(SPELLBOOK or "Spellbook")
-        tab1:SetEnabled(bookType ~= "spell" and not locked)
+        tab1:SetEnabled(bookType ~= "spell")
         tab1:Show()
         tab2.bookType = "pet"
         tab2:SetText(petTitle or PET or "Pet")
-        tab2:SetEnabled(bookType ~= "pet" and not locked)
+        tab2:SetEnabled(bookType ~= "pet")
         tab2:Show()
     else
         tab1:Hide()
@@ -593,12 +658,16 @@ function SB.Update()
     end
     local pageNum = currentPage()
     frame.PageText:SetFormattedText(PAGE_NUMBER or "Page %d", pageNum)
-    frame.Prev:SetEnabled(pageNum > 1 and not locked)
-    frame.Next:SetEnabled(pageNum < pages and not locked)
+    frame.Prev:SetEnabled(pageNum > 1)
+    frame.Next:SetEnabled(pageNum < pages)
 
-    Combat.Run("spellbook:buttons", function()
+    -- the visible slots follow at once; the secure cast buttons when combat allows
+    for _, button in ipairs(frame.buttons) do
+        updateButton(button)
+    end
+    Combat.Run("spellbook:attributes", function()
         for _, button in ipairs(frame.buttons) do
-            updateButton(button)
+            updateAttributes(button)
         end
     end)
 end
@@ -670,31 +739,27 @@ function SB:Enable()
         if frame:IsShown() then
             SB.Update()
         end
+        SB.SyncOverlay()
     end)
 end
 
 function SB:Disable()
     ns.UnregisterAllEvents(self)
-    if frame and not InCombatLockdown() then
-        frame:Hide()
+    if frame then
+        frame:Hide() -- an ordinary frame; the overlay follows through SyncOverlay when combat allows
     end
-    if toggleButton and not InCombatLockdown() then
-        ClearOverrideBindings(toggleButton)
+    if toggleButton then
+        Combat.Run("spellbook:bindings", function()
+            ClearOverrideBindings(toggleButton)
+        end)
     end
     ns.Print("SpellBook disabled, /reload to restore the Blizzard spellbook")
 end
 
 function SB:Refresh() end
 
--- Out of combat our code may show and hide the (protected) window itself. In
--- combat only the secure toggle can, which the key binding and the micro
--- button use directly; other callers get the game's own combat message.
 function SB.Toggle()
     if not frame then
-        return
-    end
-    if InCombatLockdown() then
-        UIErrorsFrame:AddMessage(ERR_NOT_IN_COMBAT or "You cannot do that while in combat", 1, 0.1, 0.1)
         return
     end
     if frame:IsShown() then
@@ -702,19 +767,6 @@ function SB.Toggle()
     else
         frame:Show()
     end
-end
-
--- Attach the toggle snippet to another secure click handler (the micro button)
-function SB.SecureToggle(handler)
-    if not handler or not handler.SetFrameRef then
-        return
-    end
-    if not frame then
-        table.insert(pendingHandlers, handler) -- ActionBars enables before this module
-        return
-    end
-    handler:SetFrameRef("book", frame)
-    handler:SetAttribute("_onclick", TOGGLE_SNIPPET)
 end
 
 function SB.IsShown()

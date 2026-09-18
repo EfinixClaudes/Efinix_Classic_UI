@@ -53,7 +53,7 @@ COMMANDS  (type them in the chat box)
                             Also a checkbox in the options window.
 /fcui disable Bags          turns a part off. Parts: ActionBars, UnitFrames, CastBar,
                             SwingTimer, Minimap, Auras, Chat, Tooltip, Nameplates,
-                            RaidFrames, LootFrame, SpellBook, Bags.
+                            RaidFrames, LootFrame, SpellBook, Bags, Vendor.
 /fcui enable Bags           turns it on again. Both need /reload afterwards.
 /fcui reset                 forgets all settings, then /reload
 
@@ -83,8 +83,9 @@ Raid frames: the modern compact raid frames are hidden. Use the raid tab of the
 social window and drag groups out of it, as in 2006.
 Spellbook: P (or the spellbook button in the micro menu) opens the old two-page
 book with the skill tabs on the right. Drag spells to your bars as usual. It opens
-and closes in combat too, and Escape closes it; while you are in combat the page
-arrows and tabs are locked, as the game does not allow the buttons to change spells.
+and closes in combat too, and Escape closes it. Clicking a spell in the book casts
+it, except during combat, where the game only lets you look, read tooltips and
+drag; casting from the book is back the moment the fight ends.
 Loot window: the small 2006 loot panel with four item slots and page arrows
 opens at the top left, or under the mouse if you have that option turned on.
 The options window (/fcui) lets you turn the spellbook and loot window off
@@ -108,6 +109,8 @@ Type in the search box to dim everything that does not match.
 The coin icon next to "Sort" sells all grey junk while a vendor is open; the same
 icon sits next to the repair buttons in the vendor window. Holding Shift for about
 one second at a vendor sells all junk and repairs all your gear automatically.
+These vendor features are their own part ("Vendor" in the options), so they keep
+working when the bag window is turned off.
 At a banker the bank window opens next to it. Buying new bank tabs is done
 through the "Blizzard bank" button in the bank window.
 

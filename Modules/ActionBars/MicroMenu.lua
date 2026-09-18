@@ -251,18 +251,17 @@ end
 
 local function createOwnButtons()
     if not MicroMenu.own.Spellbook and ns.db.modules.SpellBook and ns.SpellBook then
-        -- secure click handler: the book can then be opened and closed in combat too
         local button = createOwnButton(
             "Spellbook",
             SPELLBOOK_ABILITIES_BUTTON or "Spellbook",
             "TOGGLESPELLBOOK",
-            nil,
+            function()
+                ns.SpellBook.Toggle()
+            end,
             function()
                 return ns.SpellBook.IsShown()
-            end,
-            "SecureHandlerClickTemplate"
+            end
         )
-        ns.SpellBook.SecureToggle(button)
         reskin(button, { asset = "Micro.Spellbook" })
         if not Assets.Get("Micro.Spellbook") then
             button:Hide()

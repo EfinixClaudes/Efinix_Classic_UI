@@ -16,7 +16,11 @@ local Assets = ns.Assets
 local Bags = ns.Bags
 
 local Junk = {}
-Bags.Junk = Junk
+Bags.Junk = Junk -- the bag window's coin icon uses Junk.CreateButton
+
+-- Own module: the vendor features work with the bag window turned off.
+local Vendor = ns.RegisterModule("Vendor", {})
+ns.Vendor = Vendor
 
 local SHIFT_HOLD_SECONDS = 1.5
 local POOR = Enum and Enum.ItemQuality and Enum.ItemQuality.Poor or 0
@@ -269,4 +273,31 @@ end
 function Junk.SetShiftSell(enabled)
     ns.db.bags.shiftSell = enabled
     ns.Print("hold Shift at a vendor to sell junk and repair: %s", enabled and "on" or "off")
+end
+
+function Vendor:Init() end
+
+function Vendor:Enable()
+    Junk.Enable()
+end
+
+function Vendor:Disable()
+    ns.UnregisterAllEvents(Junk)
+    Raw.Hide(watcher)
+    if Junk.merchantButton then
+        Junk.merchantButton:Hide()
+    end
+    ns.Print("Vendor: shift-to-sell and the vendor junk icon are off")
+end
+
+function Vendor:Refresh() end
+
+function Vendor:Diag()
+    ns.Print(
+        "  shiftSell=%s merchantOpen=%s watcher shown=%s junk=%d",
+        tostring(ns.db.bags.shiftSell),
+        tostring(merchantOpen()),
+        tostring(Raw.IsShown(watcher)),
+        Junk.Count()
+    )
 end

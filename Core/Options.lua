@@ -24,6 +24,7 @@ local MODULES = {
     { key = "LootFrame", label = "Loot window" },
     { key = "SpellBook", label = "Spellbook" },
     { key = "Bags", label = "Bag window (all bags in one)" },
+    { key = "Vendor", label = "Vendor: sell junk and repair while holding Shift" },
 }
 
 local BACKDROP = {
@@ -41,7 +42,7 @@ local frame
 
 local function needsReload(key)
     -- these cannot restore Blizzard's frames without a reload
-    return key ~= "Nameplates" and key ~= "SwingTimer"
+    return key ~= "Nameplates" and key ~= "SwingTimer" and key ~= "Vendor"
 end
 
 local function createCheck(parent, entry, index)
