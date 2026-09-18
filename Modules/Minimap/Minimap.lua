@@ -404,6 +404,20 @@ end
 ---------------------------------------------------------------------------
 -- Layout pass
 ---------------------------------------------------------------------------
+function MM.Scale()
+    local scale = ns.db.minimap and tonumber(ns.db.minimap.scale)
+    return scale or 1
+end
+
+function MM.SetScale(scale)
+    ns.db.minimap = ns.db.minimap or {}
+    ns.db.minimap.scale = scale
+    MM.Layout()
+    if ns.Auras and ns.Auras.Position then
+        ns.Auras.Position()
+    end
+end
+
 local laying = false
 function MM.Layout()
     if laying or MM.state ~= "enabled" or not MinimapCluster or not Minimap then
@@ -411,7 +425,8 @@ function MM.Layout()
     end
     laying = true
     local cluster = MinimapCluster
-    local scale = ns.db.scale or 1
+    -- global bar scale times the minimap's own size setting (1.12: 192 px cluster)
+    local scale = (ns.db.scale or 1) * MM.Scale()
 
     Raw.SetScale(cluster, scale)
     Raw.ClearAllPoints(cluster)

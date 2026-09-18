@@ -32,6 +32,7 @@ local DEBUFF_COLORS = {
 local BUFFS_X, BUFFS_Y = -175, -13
 -- BuffButtons_UpdatePositions 1.12: debuff row at TemporaryEnchantFrame TOPRIGHT 0,-90 with durations
 local DEBUFFS_X, DEBUFFS_Y = -175, -13 - 90
+local MINIMAP_CLUSTER_WIDTH = 192 -- Minimap.xml 1.12: MinimapCluster 192x192
 -- Forever BuffFrame: AuraContainer anchors to CollapseAndExpandButton (15 wide) at the frame's right edge
 local COLLAPSE_BUTTON_WIDTH = 15
 
@@ -108,6 +109,10 @@ function Auras.Position()
     end
     positioning = true
     local scale = ns.db.scale or 1
+    -- a minimap larger than the 192 px cluster pushes the auras left by the extra width
+    local minimapExtra = MINIMAP_CLUSTER_WIDTH * ((ns.Minimap and ns.Minimap.Scale() or 1) - 1)
+    local buffsX = BUFFS_X - minimapExtra
+    local debuffsX = DEBUFFS_X - minimapExtra
     if BuffFrame then
         Raw.SetScale(BuffFrame, scale)
         Raw.ClearAllPoints(BuffFrame)
@@ -116,14 +121,14 @@ function Auras.Position()
             "TOPRIGHT",
             UIParent,
             "TOPRIGHT",
-            (BUFFS_X + COLLAPSE_BUTTON_WIDTH) / scale,
+            (buffsX + COLLAPSE_BUTTON_WIDTH) / scale,
             BUFFS_Y / scale
         )
     end
     if DebuffFrame then
         Raw.SetScale(DebuffFrame, scale)
         Raw.ClearAllPoints(DebuffFrame)
-        Raw.SetPoint(DebuffFrame, "TOPRIGHT", UIParent, "TOPRIGHT", DEBUFFS_X / scale, DEBUFFS_Y / scale)
+        Raw.SetPoint(DebuffFrame, "TOPRIGHT", UIParent, "TOPRIGHT", debuffsX / scale, DEBUFFS_Y / scale)
     end
     positioning = false
 end

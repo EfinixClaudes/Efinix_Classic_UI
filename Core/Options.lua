@@ -36,6 +36,7 @@ local BACKDROP = {
 }
 
 local WIDTH, ROW = 380, 24
+local SLIDER_ROW = 44
 local frame
 
 local function needsReload(key)
@@ -125,7 +126,7 @@ end
 
 local function createFrame()
     frame = CreateFrame("Frame", "FCUI_OptionsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(WIDTH, 52 + #MODULES * ROW + 150)
+    frame:SetSize(WIDTH, 52 + #MODULES * ROW + 150 + 2 * SLIDER_ROW)
     frame:SetPoint("CENTER")
     frame:SetFrameStrata("DIALOG")
     frame:SetToplevel(true)
@@ -156,7 +157,47 @@ local function createFrame()
     end, function(value)
         return ("%.2f"):format(value)
     end)
-    frame.Columns = createSlider(frame, "FCUI_OptionColumns", "Bag columns", 4, 20, 1, y - 44, function()
+    frame.MinimapScale = createSlider(
+        frame,
+        "FCUI_OptionMinimapScale",
+        "Minimap size",
+        0.8,
+        1.6,
+        0.05,
+        y - SLIDER_ROW,
+        function()
+            return ns.Minimap and ns.Minimap.Scale() or 1
+        end,
+        function(value)
+            if ns.Minimap then
+                ns.Minimap.SetScale(math.floor(value * 100 + 0.5) / 100)
+            end
+        end,
+        function(value)
+            return ("%.2f"):format(value)
+        end
+    )
+    frame.PlateScale = createSlider(
+        frame,
+        "FCUI_OptionPlateScale",
+        "Nameplate size",
+        0.8,
+        2,
+        0.05,
+        y - 2 * SLIDER_ROW,
+        function()
+            return ns.Nameplates and ns.Nameplates.Scale() or 1
+        end,
+        function(value)
+            if ns.Nameplates then
+                ns.Nameplates.SetScale(math.floor(value * 100 + 0.5) / 100)
+            end
+        end,
+        function(value)
+            return ("%.2f"):format(value)
+        end
+    )
+    frame.Columns = createSlider(frame, "FCUI_OptionColumns", "Bag columns", 4, 20, 1, y - 3 * SLIDER_ROW, function()
         return ns.db.bags and ns.db.bags.columns or 10
     end, function(value)
         if ns.Bags then
@@ -200,8 +241,10 @@ function Options.Refresh()
     if frame.Scale then
         frame.Scale:Refresh()
     end
-    if frame.Columns then
-        frame.Columns:Refresh()
+    for _, key in ipairs({ "MinimapScale", "PlateScale", "Columns" }) do
+        if frame[key] then
+            frame[key]:Refresh()
+        end
     end
 end
 
@@ -214,40 +257,6 @@ function Options.Toggle()
     else
         frame:Show()
     end
-end
-
--- Minimap button in the 1.12 tracking-button dress (33x33, icon 26 under a
--- 64x64 MiniMap-TrackingBorder), below the tracking icon on the cluster's
--- left edge. Left click opens the options.
-function Options.CreateMinimapButton()
-    if Options.minimapButton or not MinimapCluster then
-        return
-    end
-    local button = CreateFrame("Button", "FCUI_MinimapButton", MinimapCluster)
-    button:SetSize(33, 33)
-    button:SetPoint("TOPLEFT", MinimapCluster, "TOPLEFT", -15, -36)
-    button:SetFrameLevel(MinimapCluster:GetFrameLevel() + 8)
-    button.Icon = button:CreateTexture(nil, "BACKGROUND")
-    button.Icon:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
-    button.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    button.Icon:SetSize(20, 20)
-    button.Icon:SetPoint("TOPLEFT", button, "TOPLEFT", 7, -6)
-    button.Border = button:CreateTexture(nil, "OVERLAY")
-    button.Border:SetTexture(ns.Assets.Resolve("Interface\\Minimap\\MiniMap-TrackingBorder"))
-    button.Border:SetSize(52, 52)
-    button.Border:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
-    button:SetHighlightTexture(ns.Assets.Resolve("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight"), "ADD")
-    button:SetScript("OnClick", Options.Toggle)
-    button:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:SetText("Efinix Classic UI", 1, 1, 1)
-        GameTooltip:AddLine("Click to open the options", 0.8, 0.8, 0.8)
-        GameTooltip:Show()
-    end)
-    button:SetScript("OnLeave", function()
-        GameTooltip:Hide()
-    end)
-    Options.minimapButton = button
 end
 
 -- Interface > AddOns entry: a small canvas with a button that opens our window

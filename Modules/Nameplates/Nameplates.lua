@@ -19,45 +19,85 @@ local Nameplates = ns.RegisterModule("Nameplates", {})
 ns.Nameplates = Nameplates
 
 local STYLE_CVAR = "nameplateStyle"
+local GLOBAL_SCALE_CVAR = "nameplateGlobalScale"
+local BAR_HEIGHT = 14 -- 1.12 bar fill; with the 1 px frame it is the 16 px engine plate
+local DEFAULT_SCALE = 1.3 -- players find the 128x16 engine plate small on today's screens
 
 local function classicStyle()
     return Enum and Enum.NamePlateStyle and Enum.NamePlateStyle.Classic
 end
 
-local function currentStyle()
-    local value = C_CVar and C_CVar.GetCVar and C_CVar.GetCVar(STYLE_CVAR)
-    return tonumber(value)
+local function getCVar(name)
+    local value = C_CVar and C_CVar.GetCVar and C_CVar.GetCVar(name)
+    return value
+end
+
+function Nameplates.Scale()
+    local scale = ns.db.nameplates and tonumber(ns.db.nameplates.scale)
+    return scale or DEFAULT_SCALE
+end
+
+-- cvars we set, with the value we want; the player's previous values are kept
+-- in the DB so Disable can put them back. 1.12 drew every plate at one size:
+-- no shrinking with distance (nameplateMin/MaxScale arrived with 7.0).
+local function wantedCVars()
+    local classic = classicStyle()
+    return {
+        { name = STYLE_CVAR, value = classic and tostring(classic) },
+        { name = GLOBAL_SCALE_CVAR, value = ("%.2f"):format(Nameplates.Scale()) },
+        { name = "nameplateMinScale", value = "1" },
+        { name = "nameplateMaxScale", value = "1" },
+    }
+end
+
+local function setCVar(name, value)
+    if not C_CVar or not C_CVar.SetCVar then
+        return
+    end
+    local current = getCVar(name)
+    if current == nil or current == value then
+        return -- unknown on this client, or already right
+    end
+    local previous = ns.db.nameplates.previous
+    if previous[name] == nil then
+        previous[name] = current
+    end
+    C_CVar.SetCVar(name, value)
+    ns.Log("Nameplates", "%s %s -> %s", name, tostring(current), value)
 end
 
 function Nameplates.Apply()
-    local classic = classicStyle()
-    if not classic then
+    if not classicStyle() then
         ns.Log("Nameplates", "Enum.NamePlateStyle.Classic missing, nameplates left untouched")
         return false
     end
-    local current = currentStyle()
-    if current == classic then
-        return true
+    for _, cvar in ipairs(wantedCVars()) do
+        if cvar.value then
+            setCVar(cvar.name, cvar.value)
+        end
     end
-    -- remember what the player had so Disable can put it back
-    if current and ns.db.nameplates.previousStyle == nil then
-        ns.db.nameplates.previousStyle = current
-    end
-    C_CVar.SetCVar(STYLE_CVAR, tostring(classic))
-    ns.Log("Nameplates", "nameplateStyle %s -> %d", tostring(current), classic)
     return true
 end
 
 function Nameplates.Restore()
-    local previous = ns.db.nameplates.previousStyle
-    if previous ~= nil and C_CVar and C_CVar.SetCVar then
-        C_CVar.SetCVar(STYLE_CVAR, tostring(previous))
-        ns.db.nameplates.previousStyle = nil
+    if not C_CVar or not C_CVar.SetCVar then
+        return
     end
+    for name, value in pairs(ns.db.nameplates.previous) do
+        C_CVar.SetCVar(name, tostring(value))
+        ns.db.nameplates.previous[name] = nil
+    end
+end
+
+function Nameplates.SetScale(scale)
+    ns.db.nameplates.scale = scale
+    Nameplates.Apply()
+    Nameplates.RefreshPlates()
 end
 
 function Nameplates:Init()
     ns.db.nameplates = ns.db.nameplates or {}
+    ns.db.nameplates.previous = ns.db.nameplates.previous or {}
     if not NamePlateDriverFrame then
         error("NamePlateDriverFrame not found; this client does not match docs/CLIENT_FACTS.md")
     end
@@ -111,6 +151,14 @@ local function applyPlateArt(unitFrame)
     if not healthBar then
         return
     end
+    -- 1.12 plate height; Blizzard's classic style uses 10, the engine plate was 16 with frame
+    local options = NamePlateSetupOptions
+    local vertical = options and tonumber(options.verticalScale) or 1
+    container:SetHeight(BAR_HEIGHT * vertical)
+    -- clients without nameplateGlobalScale: scale the drawn frame instead
+    if getCVar(GLOBAL_SCALE_CVAR) == nil then
+        unitFrame:SetScale(Nameplates.Scale())
+    end
     -- bar: full container width minus the level gap, 1.12 style flat fill
     healthBar:ClearAllPoints()
     healthBar:SetPoint("TOPLEFT", container, "TOPLEFT", 1, 0)
@@ -157,6 +205,18 @@ local function skinUnitFrame(unitFrame)
     end
 end
 
+-- re-run the art on every plate currently shown (scale changes from the options window)
+function Nameplates.RefreshPlates()
+    if not C_NamePlate or not C_NamePlate.GetNamePlates then
+        return
+    end
+    for _, base in ipairs(C_NamePlate.GetNamePlates()) do
+        if base.UnitFrame then
+            applyPlateArt(base.UnitFrame)
+        end
+    end
+end
+
 local function onNamePlateAdded(_, unitToken)
     local base = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(unitToken)
     if base then
@@ -185,10 +245,14 @@ function Nameplates:Refresh()
 end
 
 function Nameplates:Diag()
-    ns.Print(
-        "  nameplateStyle=%s classic=%s previous=%s",
-        tostring(currentStyle()),
-        tostring(classicStyle()),
-        tostring(ns.db.nameplates and ns.db.nameplates.previousStyle)
-    )
+    ns.Print("  classic style=%s scale=%.2f", tostring(classicStyle()), Nameplates.Scale())
+    for _, cvar in ipairs(wantedCVars()) do
+        ns.Print(
+            "  %s=%s (want %s, previous %s)",
+            cvar.name,
+            tostring(getCVar(cvar.name)),
+            tostring(cvar.value),
+            tostring(ns.db.nameplates.previous[cvar.name])
+        )
+    end
 end

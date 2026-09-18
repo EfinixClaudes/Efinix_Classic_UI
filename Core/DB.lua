@@ -4,7 +4,7 @@ local DB = {}
 ns.DB = DB
 
 local DEFAULTS = {
-    version = 3,
+    version = 4,
     scale = 1,
     modules = {
         ActionBars = true,
@@ -21,8 +21,10 @@ local DEFAULTS = {
         SpellBook = true,
         Bags = true,
     },
-    -- Nameplates: the player's nameplateStyle cvar before we switched it to Classic
-    nameplates = { previousStyle = nil },
+    -- Nameplates: plate scale and the player's cvar values before we changed them (name -> value)
+    nameplates = { scale = 1.3, previous = {} },
+    -- Minimap: extra scale on top of the global one
+    minimap = { scale = 1.2 },
     -- SwingTimer: the player's showSwingTimer cvar before we switched it on
     swingTimer = { previous = nil },
     -- UnitFrames: player-chosen frame positions, name -> {point, x, y} on UIParent
@@ -59,6 +61,16 @@ local migrations = {
     -- entries mixed anchor points and are unusable, so they are dropped.
     [3] = function(db)
         db.positions = {}
+    end,
+    -- 4: Nameplates keeps every cvar it changes under nameplates.previous
+    [4] = function(db)
+        if type(db.nameplates) == "table" then
+            db.nameplates.previous = db.nameplates.previous or {}
+            if db.nameplates.previousStyle ~= nil then
+                db.nameplates.previous.nameplateStyle = tostring(db.nameplates.previousStyle)
+                db.nameplates.previousStyle = nil
+            end
+        end
     end,
 }
 
