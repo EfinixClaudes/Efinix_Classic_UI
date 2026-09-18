@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-18.21" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-18.22" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -218,7 +218,19 @@ ns.RegisterEvent("PLAYER_LOGIN", ns, function()
         ns.RefreshAll()
     end)
     ns.Options.RegisterSettings()
-    ns.Print("build %s loaded", ns.BUILD)
+    local off = {}
+    for _, name in ipairs(ns.moduleOrder) do
+        if ns.modules[name].state ~= "enabled" then
+            off[#off + 1] = name .. " (" .. ns.modules[name].state .. ")"
+        end
+    end
+    ns.Print(
+        "build %s loaded, settings from %s; parts off: %s; dark mode %s",
+        ns.BUILD,
+        ns.DB.loadedFromFile and "your saved file" or "defaults (no saved file yet)",
+        #off > 0 and table.concat(off, ", ") or "none",
+        ns.Dark.Enabled() and "on" or "off"
+    )
 end)
 
 ---------------------------------------------------------------------------
