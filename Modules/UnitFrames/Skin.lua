@@ -141,8 +141,8 @@ local function playerArt()
     hide(container.AlternatePowerFrameTexture)
     hide(container.FrameFlash)
 
-    -- Portrait 64x64 at 42,-12, no rounded mask
-    unmask(container.PlayerPortrait, container.PlayerPortraitMask)
+    -- Portrait 64x64 at 42,-12. 1.12 portraits were rendered round by the engine and the
+    -- frame art is transparent around the ring, so Blizzard's circular mask stays on.
     container.PlayerPortrait:ClearAllPoints()
     container.PlayerPortrait:SetSize(64, 64)
     container.PlayerPortrait:SetPoint("TOPLEFT", frame, "TOPLEFT", 42, -12)
@@ -367,7 +367,6 @@ local function targetArt(frame)
     hide(container.BossPortraitFrameTexture)
     hide(container.Flash)
 
-    unmask(container.Portrait, container.PortraitMask)
     container.Portrait:ClearAllPoints()
     container.Portrait:SetSize(64, 64)
     container.Portrait:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -42, -12)
@@ -510,7 +509,6 @@ local function totArt(frame)
         frame.FrameTexture:ClearAllPoints()
         frame.FrameTexture:SetAllPoints(frame)
     end
-    unmask(frame.Portrait, frame.PortraitMask)
     frame.Portrait:ClearAllPoints()
     frame.Portrait:SetSize(35, 35)
     frame.Portrait:SetPoint("TOPLEFT", frame, "TOPLEFT", 6, -6)
@@ -553,7 +551,6 @@ local function petArt()
         PetFrameTexture:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, -2)
     end
     hide(PetFrameFlash)
-    unmask(frame.Portrait, frame.PortraitMask)
     frame.Portrait:ClearAllPoints()
     frame.Portrait:SetSize(37, 37)
     frame.Portrait:SetPoint("TOPLEFT", frame, "TOPLEFT", 7, -6)

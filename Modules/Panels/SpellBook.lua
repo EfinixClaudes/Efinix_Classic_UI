@@ -481,13 +481,21 @@ local function createFrame()
     frame.NextText:SetText(NEXT or "Next")
     frame.NextText:SetPoint("RIGHT", frame.Next, "LEFT", 0, 0)
 
+    local function updateMicroButton()
+        local micro = ns.ActionBars and ns.ActionBars.MicroMenu
+        if micro and micro.UpdateOwnStates then
+            micro.UpdateOwnStates()
+        end
+    end
     frame:SetScript("OnShow", function()
         refreshLines()
         SB.Update()
         PlaySound(bookType == "pet" and SOUNDKIT.IG_ABILITY_OPEN or SOUNDKIT.IG_SPELLBOOK_OPEN)
+        updateMicroButton()
     end)
     frame:SetScript("OnHide", function()
         PlaySound(bookType == "pet" and SOUNDKIT.IG_ABILITY_CLOSE or SOUNDKIT.IG_SPELLBOOK_CLOSE)
+        updateMicroButton()
     end)
     table.insert(UISpecialFrames, "FCUI_SpellBookFrame")
 end
@@ -557,17 +565,25 @@ local function toggle()
     end
 end
 
--- Blizzard opens PlayerSpellsFrame on the spellbook tab; close it again and open ours.
-local function interceptBlizzard()
-    if PlayerSpellsFrame and PlayerSpellsFrame:IsShown() then
-        HideUIPanel(PlayerSpellsFrame)
-        toggle()
-    elseif frame:IsShown() then
-        -- Blizzard toggled its book closed; mirror that
-        frame:Hide()
-    else
-        toggle()
+-- The spellbook key binding is redirected to our book with override bindings
+-- (out of combat only; existing overrides keep working in combat). This way
+-- Blizzard's PlayerSpellsFrame is never shown or hidden by our code, which
+-- keeps the UI panel manager free of taint. The micro button is ours as well
+-- (see ActionBars/MicroMenu.lua).
+local toggleButton
+local function updateBindings()
+    if not toggleButton then
+        return
     end
+    Combat.Run("spellbook:bindings", function()
+        ClearOverrideBindings(toggleButton)
+        local key1, key2 = GetBindingKey("TOGGLESPELLBOOK")
+        for _, key in ipairs({ key1, key2 }) do
+            if key then
+                SetOverrideBindingClick(toggleButton, true, key, toggleButton:GetName())
+            end
+        end
+    end)
 end
 
 ---------------------------------------------------------------------------
@@ -584,13 +600,13 @@ function SB:Init()
 end
 
 function SB:Enable()
-    if PlayerSpellsUtil then
-        for _, name in ipairs({ "ToggleSpellBookFrame", "OpenToSpellBookTab" }) do
-            if type(PlayerSpellsUtil[name]) == "function" then
-                hooksecurefunc(PlayerSpellsUtil, name, interceptBlizzard)
-            end
-        end
+    if not toggleButton then
+        toggleButton = CreateFrame("Button", "FCUI_SpellBookToggle", UIParent)
+        toggleButton:Hide()
+        toggleButton:SetScript("OnClick", toggle)
     end
+    updateBindings()
+    ns.RegisterEvent("UPDATE_BINDINGS", self, updateBindings)
     local function refresh()
         if frame:IsShown() then
             refreshLines()
@@ -630,6 +646,9 @@ function SB:Disable()
     if frame then
         frame:Hide()
     end
+    if toggleButton and not InCombatLockdown() then
+        ClearOverrideBindings(toggleButton)
+    end
     ns.Print("SpellBook disabled, /reload to restore the Blizzard spellbook")
 end
 
@@ -639,6 +658,10 @@ function SB.Toggle()
     if frame then
         toggle()
     end
+end
+
+function SB.IsShown()
+    return frame ~= nil and frame:IsShown()
 end
 
 function SB:Diag()

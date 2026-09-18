@@ -63,8 +63,37 @@ function Nameplates:Init()
     end
 end
 
+-- Camelot adds a separate level box (NameplateLevelFrame, atlas
+-- ui-hud-nameplates-levelindicator) next to every plate. The classic style
+-- already prints the level in the border's pocket (LevelFrame), which is
+-- where 1.12 had it, so the box is hidden on every unit frame that gets used.
+local levelBoxHooked = setmetatable({}, { __mode = "k" })
+local function hideLevelBox(unitFrame)
+    local box = unitFrame and unitFrame.PlayerLevelDiffFrame
+    if not box then
+        return
+    end
+    box:Hide()
+    if not levelBoxHooked[box] then
+        levelBoxHooked[box] = true
+        hooksecurefunc(box, "Show", function(self)
+            self:Hide()
+        end)
+    end
+end
+
+local function onNamePlateAdded(_, unitToken)
+    local base = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(unitToken)
+    if base then
+        hideLevelBox(base.UnitFrame)
+    end
+end
+
 function Nameplates:Enable()
     Nameplates.Apply()
+    if NamePlateDriverFrame and type(NamePlateDriverFrame.OnNamePlateAdded) == "function" then
+        hooksecurefunc(NamePlateDriverFrame, "OnNamePlateAdded", onNamePlateAdded)
+    end
     -- the cvar is per character; re-apply when settings are (re)loaded
     ns.RegisterEvent("VARIABLES_LOADED", self, Nameplates.Apply)
     ns.RegisterEvent("PLAYER_ENTERING_WORLD", self, Nameplates.Apply)

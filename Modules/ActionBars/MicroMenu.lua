@@ -20,7 +20,8 @@ AB.MicroMenu = MicroMenu
 
 local CLASSIC = {
     { frame = "CharacterMicroButton", character = true },
-    { frame = "SpellbookMicroButton", asset = "Micro.Spellbook" },
+    -- our own button when the SpellBook module runs, Blizzard's otherwise
+    { own = "Spellbook", frame = "SpellbookMicroButton", asset = "Micro.Spellbook" },
     { frame = "TalentMicroButton", asset = "Micro.Talents" },
     { frame = "QuestLogMicroButton", asset = "Micro.Quest" },
     { own = "Socials", asset = "Micro.Socials" },
@@ -211,6 +212,23 @@ local function createOwnButton(key, label, binding, onClick, isPushed)
 end
 
 local function createOwnButtons()
+    if not MicroMenu.own.Spellbook and ns.db.modules.SpellBook and ns.SpellBook then
+        local button = createOwnButton(
+            "Spellbook",
+            SPELLBOOK_ABILITIES_BUTTON or "Spellbook",
+            "TOGGLESPELLBOOK",
+            function()
+                ns.SpellBook.Toggle()
+            end,
+            function()
+                return ns.SpellBook.IsShown()
+            end
+        )
+        reskin(button, { asset = "Micro.Spellbook" })
+        if not Assets.Get("Micro.Spellbook") then
+            button:Hide()
+        end
+    end
     if not MicroMenu.own.Socials then
         local button = createOwnButton("Socials", SOCIAL_BUTTON or "Social", "TOGGLESOCIAL", function()
             if ToggleFriendsFrame then
@@ -244,6 +262,7 @@ local function updateOwnStates()
         button:UpdateState()
     end
 end
+MicroMenu.UpdateOwnStates = updateOwnStates
 
 ---------------------------------------------------------------------------
 -- Positioning (MainMenuBarMicroButtons.xml: first at BOTTOMLEFT 552,2 of the
@@ -307,12 +326,21 @@ function MicroMenu.Enable()
     for _, entry in ipairs(CLASSIC) do
         if entry.frame then
             local button = _G[entry.frame]
-            if button then
+            if button and entry.own and MicroMenu.own[entry.own] then
+                -- replaced by our own button (its click must not go through Blizzard's panel code)
+                ns.Suppress(button)
+            elseif button then
                 reskin(button, entry)
                 AB.HookScript(button, "OnShow", MicroMenu.Position)
                 AB.HookScript(button, "OnHide", MicroMenu.Position)
             end
         end
+    end
+
+    -- HelpOpenWebTicketButton (Blizzard_HelpFrame): a 34x35 red "?" Blizzard anchors 25 px
+    -- above the outer micro button; 1.12 had no such button, tickets live in the help panel.
+    if HelpOpenWebTicketButton then
+        ns.Suppress(HelpOpenWebTicketButton)
     end
 
     for _, entry in ipairs(MODERN) do

@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-18.5" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-18.6" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -217,6 +217,7 @@ ns.RegisterEvent("PLAYER_LOGIN", ns, function()
     ns.RegisterEvent("PLAYER_ENTERING_WORLD", ns, function()
         ns.RefreshAll()
     end)
+    ns.Options.RegisterSettings()
     ns.Print("build %s loaded", ns.BUILD)
 end)
 
@@ -290,7 +291,9 @@ end
 SlashCmdList.FCUI = function(input)
     input = (input or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     local cmd, rest = input:match("^(%S*)%s*(.-)$")
-    if cmd == "status" or cmd == "" then
+    if cmd == "" or cmd == "options" or cmd == "config" then
+        ns.Options.Toggle()
+    elseif cmd == "status" then
         status()
     elseif cmd == "diag" then
         diag(rest)
@@ -359,7 +362,7 @@ SlashCmdList.FCUI = function(input)
         ns.DB.Reset()
         ns.Print("settings reset, /reload to apply")
     else
-        ns.Print("commands: status, missing, diag [module], enable <module>, disable <module>, scale <n>")
+        ns.Print("commands: options, status, missing, diag [module], enable <module>, disable <module>, scale <n>")
         ns.Print("          move [reset], bags columns <n>, bags bankcolumns <n>, reset")
     end
 end
