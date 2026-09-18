@@ -294,9 +294,8 @@ function MicroMenu.Enable()
     -- Camelot's MicroMenu (Blizzard_MicroMenu/Camelot/MainMenuBarMicroMenu.xml) carries
     -- its own frame and background art (UI-HUD-ActionBar-Frame / -IconFrame-Background)
     -- around the buttons; 1.12 had none, the buttons sat straight on the bar art.
-    local menu = _G.MicroMenu
     for _, key in ipairs({ "BorderArt", "BackgroundArt" }) do
-        local art = menu and menu[key]
+        local art = _G.MicroMenu and _G.MicroMenu[key]
         if art then
             art:Hide()
             AB.Hook(art, "Show", function(self)
