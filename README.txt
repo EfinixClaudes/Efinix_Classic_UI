@@ -31,7 +31,8 @@ COMMANDS  (type them in the chat box)
 --------
 
 /fcui                       opens the options window (turn parts on or off, bar scale,
-                            bag columns). Also found under Options > AddOns.
+                            minimap size, nameplate size, bag columns). Also found
+                            under Options > AddOns.
 /fcui status                shows what is running and which old textures are missing
 /fcui missing               lists only the old texture files your client does not have
 /fcui move                  shows green boxes on the player, target, focus and pet
@@ -64,9 +65,13 @@ and ranged auto-attack timers, using the game's own swing timer dressed in the
 old cast bar look. Type /fcui disable SwingTimer if you do not want it; that also
 switches the game's swing timer setting back to what it was. Edit Mode lets you
 choose whether the bars show always or only in combat.
-Nameplates: the addon switches the game's nameplate style to its hidden "Classic"
-look. Turning the Nameplates part off (or removing the addon after
-/fcui disable Nameplates) puts your old style back.
+Nameplates: the addon draws the flat 2006 plate (coloured bar, thin black frame,
+level to the right) and switches off the game's shrinking of far-away plates, as
+there was none back then. "Nameplate size" in the options makes them bigger or
+smaller. Turning the Nameplates part off (or removing the addon after
+/fcui disable Nameplates) puts your old nameplate settings back.
+Minimap: "Minimap size" in the options scales the whole minimap cluster; the
+buffs move left to make room.
 Raid frames: the modern compact raid frames are hidden. Use the raid tab of the
 social window and drag groups out of it, as in 2006.
 Edit Mode still works for things the addon does not manage; positions and sizes
