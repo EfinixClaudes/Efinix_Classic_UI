@@ -23,13 +23,17 @@ local FILES = {
 local present = {}
 local function file(key)
     if present[key] == nil then
-        local exists = ns.Compat.TextureExists(FILES[key])
-        present[key] = exists ~= false
-        if not present[key] then
-            ns.Log("UnitFrames", "missing texture %s", FILES[key])
+        if ns.Assets.HasMedia(FILES[key]) then
+            present[key] = true
+        else
+            local exists = ns.Compat.TextureExists(FILES[key])
+            present[key] = exists ~= false
+            if not present[key] then
+                ns.Log("UnitFrames", "missing texture %s", FILES[key])
+            end
         end
     end
-    return present[key] and FILES[key] or nil
+    return present[key] and ns.Assets.Resolve(FILES[key]) or nil
 end
 
 local POWER_COLORS = {

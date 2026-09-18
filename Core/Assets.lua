@@ -119,6 +119,28 @@ local entries = {
 local missing = {}
 local verifiedCount = 0
 
+---------------------------------------------------------------------------
+-- Local media. Media/Blizzard/Local.lua (generated on the player's machine by
+-- tools/import_blizzard_art.py from a client art export, never shipped) sets
+-- ns.BlizzardMedia[lowercase "interface\\..." path] = true for every old file
+-- that was copied into Media/Blizzard. Those paths are redirected into the
+-- addon folder, so they load even when this client no longer ships the file.
+---------------------------------------------------------------------------
+local MEDIA_ROOT = "Interface\\AddOns\\" .. ns.name .. "\\Media\\Blizzard\\"
+
+function Assets.HasMedia(path)
+    local media = ns.BlizzardMedia
+    return media ~= nil and media[path:lower()] == true
+end
+
+-- Blizzard path -> the path to use with SetTexture. Same string when we have no local copy.
+function Assets.Resolve(path)
+    if Assets.HasMedia(path) then
+        return MEDIA_ROOT .. path:sub(#"Interface\\" + 1)
+    end
+    return path
+end
+
 -- Micro button sheets are "<base>-Up/-Down/-Disabled"; verify the -Up file.
 local function probePath(entry)
     local path = entry.path
@@ -132,11 +154,15 @@ function Assets.Verify()
     missing = {}
     verifiedCount = 0
     for name, entry in pairs(entries) do
-        local exists = ns.Compat.TextureExists(probePath(entry))
-        if exists == nil then
-            entry.present = entry.verified or false
+        if Assets.HasMedia(entry.path) then
+            entry.present = true
         else
-            entry.present = exists
+            local exists = ns.Compat.TextureExists(probePath(entry))
+            if exists == nil then
+                entry.present = entry.verified or false
+            else
+                entry.present = exists
+            end
         end
         if entry.present then
             verifiedCount = verifiedCount + 1
@@ -155,7 +181,7 @@ function Assets.Get(name)
     local entry = entries[name]
     assert(entry, "unknown asset " .. tostring(name))
     if entry.present then
-        return entry.path
+        return Assets.Resolve(entry.path)
     end
     return nil
 end
@@ -164,7 +190,15 @@ end
 function Assets.Path(name)
     local entry = entries[name]
     assert(entry, "unknown asset " .. tostring(name))
-    return entry.path
+    return Assets.Resolve(entry.path)
+end
+
+function Assets.MediaCount()
+    local count = 0
+    for _ in pairs(ns.BlizzardMedia or {}) do
+        count = count + 1
+    end
+    return count
 end
 
 function Assets.Missing()

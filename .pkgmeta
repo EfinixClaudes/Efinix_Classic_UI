@@ -2,3 +2,5 @@ package-as: Efinix_Classic_UI
 enable-nolib-creation: no
 ignore:
   - .github
+  - Media/Blizzard
+  - tools

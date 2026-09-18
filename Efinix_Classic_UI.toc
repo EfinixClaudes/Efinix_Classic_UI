@@ -10,6 +10,7 @@
 ## X-Category: Interface Enhancements
 
 Core\Init.lua
+Media\Blizzard\Local.lua
 Core\Compat.lua
 Core\Combat.lua
 Core\Hide.lua
