@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-18.25" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-18.26" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -198,42 +198,10 @@ end
 ---------------------------------------------------------------------------
 -- Startup
 ---------------------------------------------------------------------------
--- Persistence probes: the client does not hand us ForeverClassicUIDB back.
--- Three independent stores are written at PLAYER_ENTERING_WORLD and read
--- back at ADDON_LOADED: a second account-wide saved variable, a per-character
--- saved variable and an addon-registered cvar. /fcui status and the login
--- line report which of them survived the reload.
-local PROBE_CVAR = "fcuiProbe"
-ns.probes = {}
-local function readProbes(event)
-    local function stamp(t)
-        return type(t) == "table" and tostring(t.written) or "none"
-    end
-    local cvar = C_CVar and C_CVar.GetCVar and C_CVar.GetCVar(PROBE_CVAR)
-    ns.probes[event] = ("account=%s character=%s cvar=%s"):format(
-        stamp(EfinixClassicUIProbe),
-        stamp(EfinixClassicUICharProbe),
-        tostring(cvar)
-    )
-end
-
-local function writeProbes()
-    local now = tostring(time())
-    EfinixClassicUIProbe = { written = now, build = ns.BUILD }
-    EfinixClassicUICharProbe = { written = now, build = ns.BUILD }
-    if C_CVar and C_CVar.RegisterCVar and C_CVar.SetCVar then
-        if C_CVar.GetCVar(PROBE_CVAR) == nil then
-            pcall(C_CVar.RegisterCVar, PROBE_CVAR, "0")
-        end
-        pcall(C_CVar.SetCVar, PROBE_CVAR, now)
-    end
-end
-
 ns.RegisterEvent("ADDON_LOADED", ns, function(_, _, loaded)
     if loaded ~= ADDON then
         return
     end
-    readProbes("ADDON_LOADED")
     ns.DB.Adopt("ADDON_LOADED")
     if not ns.db then
         ns.DB.Load()
@@ -253,7 +221,6 @@ ns.RegisterEvent("PLAYER_LOGIN", ns, function()
         return
     end
     ns.DB.Adopt("PLAYER_LOGIN")
-    readProbes("PLAYER_LOGIN")
     for _, name in ipairs(ns.moduleOrder) do
         ns.EnableModule(name)
     end
@@ -264,7 +231,6 @@ ns.RegisterEvent("PLAYER_LOGIN", ns, function()
         end
         -- the game had every chance to hand us the file; from here on our table is the saved one
         ns.DB.Publish()
-        writeProbes()
     end)
     ns.RegisterEvent("PLAYER_LOGOUT", ns, function()
         ns.DB.Publish()

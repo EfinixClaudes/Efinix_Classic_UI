@@ -116,6 +116,14 @@ At a banker the bank window opens next to it. Buying new bank tabs is done
 through the "Blizzard bank" button in the bank window.
 
 
+SETTINGS
+--------
+
+Settings are saved per character. The Forever beta client writes account-wide
+addon settings but does not read them back, so the addon uses the per-character
+store, which works. Set up the options once on each character.
+
+
 PROBLEMS
 --------
 

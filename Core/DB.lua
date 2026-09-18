@@ -77,12 +77,13 @@ local migrations = {
     end,
 }
 
--- On this client the saved table is not in place when ADDON_LOADED fires for
--- us, and a global we create in the meantime is never replaced by the file
--- (seen in game: ADDON_LOADED none, VARIABLES_LOADED ours, PLAYER_LOGIN
--- ours). So the global is left untouched until the last login event; the
--- defaults live in a private table until then and are only published as the
--- global (for saving) once the game had every chance to provide the file.
+-- Forever (build 69913) writes account-wide SavedVariables but never loads
+-- them back (probed in game 2026-09-18: an account variable came back nil at
+-- every login event, a per-character variable and a registered cvar came
+-- back fine). The settings therefore live in a SavedVariablesPerCharacter
+-- variable, which is in place at ADDON_LOADED. The adopt/publish dance below
+-- stays as a guard: the global is left alone until the last login event, and
+-- our table is only published for saving if the game provided nothing.
 -- DB.seen records what each event found, for /fcui status.
 DB.seen = {} -- event -> "file" | "none" | "ours"
 
