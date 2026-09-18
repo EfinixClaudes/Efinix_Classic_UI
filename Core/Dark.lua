@@ -136,8 +136,14 @@ local PANELS = {
 local SKIP_TYPES = { Button = true, CheckButton = true, ItemButton = true }
 local walkedPanels = {} -- name -> true once hooked
 
+-- Forbidden frames (store, secure Blizzard UI) throw on any access from addon code;
+-- IsForbidden is the one method allowed on them.
+local function forbidden(object)
+    return type(object.IsForbidden) == "function" and object:IsForbidden()
+end
+
 local function isFrameArt(region, parent)
-    if region:GetObjectType() ~= "Texture" then
+    if forbidden(region) or region:GetObjectType() ~= "Texture" then
         return false
     end
     if region == parent.portrait or region == parent.Portrait or region == parent.Icon or region == parent.icon then
@@ -148,7 +154,7 @@ local function isFrameArt(region, parent)
 end
 
 local function walk(frame, depth)
-    if depth > 12 or SKIP_TYPES[frame:GetObjectType()] then
+    if depth > 12 or forbidden(frame) or SKIP_TYPES[frame:GetObjectType()] then
         return
     end
     for _, region in ipairs({ frame:GetRegions() }) do
@@ -167,10 +173,17 @@ function Dark.SkinPanel(name)
         return
     end
     walkedPanels[name] = true
-    walk(frame, 0)
+    if forbidden(frame) then
+        return
+    end
+    -- a panel that still trips on something unexpected is logged, never breaks loading
+    local ok, err = pcall(walk, frame, 0)
+    if not ok then
+        ns.Log("Dark", "%s: %s", name, tostring(err))
+    end
     frame:HookScript("OnShow", function(self)
         if Dark.Enabled() then
-            walk(self, 0)
+            pcall(walk, self, 0)
         end
     end)
 end
