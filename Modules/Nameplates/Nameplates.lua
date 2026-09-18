@@ -21,6 +21,8 @@ ns.Nameplates = Nameplates
 local STYLE_CVAR = "nameplateStyle"
 local GLOBAL_SCALE_CVAR = "nameplateGlobalScale"
 local BAR_HEIGHT = 14 -- 1.12 bar fill; with the 1 px frame it is the 16 px engine plate
+local BAR_WIDTH = 126 -- 1.12 bar fill; with the frame the 128 px engine plate
+local NAME_SPACING = 4 -- CLASSIC_HEALTH_BAR_TO_NAME_ABOVE_SPACING (Camelot constants)
 local DEFAULT_SCALE = 1.3 -- players find the 128x16 engine plate small on today's screens
 
 local function classicStyle()
@@ -128,7 +130,6 @@ end
 -- is the 1.12 sheet: its black 128x10 strip (rows 32-42 of 128) is the frame.
 local SHEET = "Interface\\TargetingFrame\\Nameplates"
 local SHEET_FRAME_COORDS = { 0, 0.5, 0.25, 0.328125 }
-local LEVEL_GAP = 22 -- room right of the bar for the level text
 
 local AGGRO_KEYS = { "aggroHighlightBase", "aggroHighlightAdditive", "aggroHighlightMask", "aggroFlash" }
 
@@ -154,15 +155,29 @@ local function applyPlateArt(unitFrame)
     -- 1.12 plate height; Blizzard's classic style uses 10, the engine plate was 16 with frame
     local options = NamePlateSetupOptions
     local vertical = options and tonumber(options.verticalScale) or 1
+    local horizontal = options and tonumber(options.horizontalScale) or 1
+    local inset = options and tonumber(options.insetWidth) or 0
     container:SetHeight(BAR_HEIGHT * vertical)
     -- clients without nameplateGlobalScale: scale the drawn frame instead
     if getCVar(GLOBAL_SCALE_CVAR) == nil then
         unitFrame:SetScale(Nameplates.Scale())
     end
-    -- bar: full container width minus the level gap, 1.12 style flat fill
+    -- Blizzard narrows the container by its side insets and the (hidden) level box;
+    -- the 1.12 bar had a fixed width, so it starts at the plate's left edge with that width
     healthBar:ClearAllPoints()
-    healthBar:SetPoint("TOPLEFT", container, "TOPLEFT", 1, 0)
-    healthBar:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", -LEVEL_GAP, 0)
+    healthBar:SetPoint("TOPLEFT", container, "TOPLEFT", 1 - inset, 0)
+    healthBar:SetPoint("BOTTOMLEFT", container, "BOTTOMLEFT", 1 - inset, 0)
+    healthBar:SetWidth(BAR_WIDTH * horizontal)
+    -- name centred over the bar, not over the narrowed container
+    local name = unitFrame.name
+    if name and not (unitFrame.IsShowOnlyName and unitFrame:IsShowOnlyName()) then
+        name:ClearAllPoints()
+        name:SetPoint("BOTTOM", healthBar, "TOP", 0, NAME_SPACING * vertical)
+    end
+    if unitFrame.RaidTargetFrame then
+        unitFrame.RaidTargetFrame:ClearAllPoints()
+        unitFrame.RaidTargetFrame:SetPoint("RIGHT", healthBar, "LEFT", -2, 0)
+    end
     -- black frame from the 1.12 sheet, one pixel around the fill
     local bg = healthBar.bgTexture
     if bg then

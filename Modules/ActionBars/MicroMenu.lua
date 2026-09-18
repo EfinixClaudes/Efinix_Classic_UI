@@ -54,27 +54,48 @@ MicroMenu.own = {}
 ---------------------------------------------------------------------------
 -- Modern buttons keep their atlases but are laid out on the classic footprint:
 -- the 32x40 art is scaled to 29x36 and sits at the bottom of the 29x58 button.
+local MODERN_W, MODERN_H = 29, 36
+local modernRegionHooked = setmetatable({}, { __mode = "k" })
+local applying = false
+local applyTextures
+
+local function fitModernRegion(button, tex)
+    tex:ClearAllPoints()
+    tex:SetPoint("BOTTOM", button, "BOTTOM", 0, 0)
+    tex:SetSize(MODERN_W, MODERN_H)
+    -- SetAtlas(atlas, true) on the region itself resizes it to the atlas; put it back
+    if not modernRegionHooked[tex] then
+        modernRegionHooked[tex] = true
+        hooksecurefunc(tex, "SetAtlas", function()
+            if not applying then
+                applyTextures(button)
+            end
+        end)
+    end
+end
+
 local function applyModernTextures(button)
     for _, getter in ipairs({ "GetNormalTexture", "GetPushedTexture", "GetDisabledTexture", "GetHighlightTexture" }) do
         local tex = button[getter] and button[getter](button)
         if tex then
-            tex:ClearAllPoints()
-            tex:SetPoint("BOTTOM", button, "BOTTOM", 0, 0)
-            tex:SetSize(29, 36)
+            fitModernRegion(button, tex)
         end
     end
     for _, key in ipairs({ "Background", "PushedBackground", "FlashBorder", "FlashContent" }) do
         local tex = button[key]
         if tex then
-            tex:ClearAllPoints()
-            tex:SetPoint("BOTTOM", button, "BOTTOM", 0, 0)
-            tex:SetSize(29, 36)
+            fitModernRegion(button, tex)
+        end
+    end
+    -- any other texture the template or a later patch added that is larger than the footprint
+    for _, region in ipairs({ button:GetRegions() }) do
+        if region:GetObjectType() == "Texture" and (region:GetWidth() > MODERN_W or region:GetHeight() > MODERN_H) then
+            fitModernRegion(button, region)
         end
     end
 end
 
-local applying = false
-local function applyTextures(button)
+function applyTextures(button)
     local entry = reskinned[button]
     if not entry or applying then
         return

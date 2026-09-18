@@ -399,5 +399,30 @@ function AB:Diag()
             bar:GetHeight()
         )
     end
+    -- micro buttons: the modern group's art sizes, for "icon too big" reports
+    for _, name in ipairs({ "EJMicroButton", "HousingMicroButton", "CollectionsMicroButton", "HelpMicroButton" }) do
+        local button = _G[name]
+        if button then
+            local parts = {}
+            for _, region in ipairs({ button:GetRegions() }) do
+                if region:GetObjectType() == "Texture" and Raw.IsShown(region) then
+                    parts[#parts + 1] = ("%s %.0fx%.0f"):format(
+                        region:GetDebugName():match("[^.]+$") or "?",
+                        region:GetWidth(),
+                        region:GetHeight()
+                    )
+                end
+            end
+            ns.Print(
+                "  %s %.0fx%.0f scale %.2f eff %.2f: %s",
+                name,
+                button:GetWidth(),
+                button:GetHeight(),
+                button:GetScale(),
+                button:GetEffectiveScale(),
+                table.concat(parts, ", ")
+            )
+        end
+    end
     ns.Print("combat queue pending: %d", Combat.Pending())
 end
