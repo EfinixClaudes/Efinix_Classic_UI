@@ -452,7 +452,12 @@ local function updateItemButton(button, bagID, slot)
     -- Cooldown
     if button.Cooldown then
         local start, duration, enable = C_Container.GetContainerItemCooldown(bagID, slot)
-        CooldownFrame_Set(button.Cooldown, start, duration, enable)
+        -- a secret cooldown cannot be handed to the widget from addon code
+        if ns.Compat.IsSecret(start) or ns.Compat.IsSecret(duration) then
+            button.Cooldown:Clear()
+        else
+            CooldownFrame_Set(button.Cooldown, start, duration, enable)
+        end
     end
 
     -- Quest markers (ContainerFrame UpdateItems logic, Vanilla-era textures)

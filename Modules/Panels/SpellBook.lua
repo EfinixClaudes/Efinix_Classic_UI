@@ -201,10 +201,19 @@ local function updateButton(button)
     button.Name:Show()
     button.SubName:Show()
 
-    -- cooldown: start, duration and rate are secret values on this client, so
-    -- they go straight into the widget (Blizzard_SpellBookItem does the same)
+    -- cooldown: while cooldowns are restricted (in combat) start, duration and
+    -- rate come back as secret values, and every Cooldown setter on this
+    -- client takes secrets only from untainted code (FrameAPICooldownDocumentation:
+    -- SetCooldown, SecretArguments AllowedWhenUntainted). So the swipe is
+    -- drawn out of combat and cleared in a fight; the tooltip still tells.
     local okCd, cooldown = pcall(C_SpellBook.GetSpellBookItemCooldown, slot, bank)
-    if okCd and type(cooldown) == "table" then
+    if
+        okCd
+        and type(cooldown) == "table"
+        and not ns.Compat.IsSecret(cooldown.startTime)
+        and not ns.Compat.IsSecret(cooldown.duration)
+        and not ns.Compat.IsSecret(cooldown.modRate)
+    then
         button.Cooldown:SetCooldown(cooldown.startTime, cooldown.duration, cooldown.modRate)
     else
         button.Cooldown:Clear()
