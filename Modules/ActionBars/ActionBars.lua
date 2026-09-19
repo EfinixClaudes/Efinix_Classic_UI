@@ -21,6 +21,8 @@ AB.SMALL_BUTTON = 30 -- BonusActionBarFrame.xml ShapeshiftButtonTemplate / PetAc
 AB.STANCE_SPACING = 7 -- BonusActionBarFrame.xml: ShapeshiftButton2 LEFT +7
 AB.PET_SPACING = 8 -- PetActionBarFrame.xml: PetActionButton2 LEFT +8
 AB.MULTIBAR_VERTICAL_SPACING = 6 -- MultiActionBars.xml: $parentButton2 TOP of $parentButton1 BOTTOM -6
+local MULTIBAR_LENGTH = 500 -- MultiActionBars.xml: HorizontalMultiBar 500x38, VerticalMultiBar 38x500
+local MULTIBAR_THICKNESS = 38
 
 -- 1.12 UIParent.lua UIPARENT_MANAGED_FRAME_POSITIONS offsets
 local OFFSET_REPUTATION = 9 -- "reputation = 9": XP bar and rep watch bar both shown
@@ -171,7 +173,15 @@ function AB.Position()
     local scale = ns.db.scale or 1
     local yStatus = statusOffset()
 
-    Raw.SetScale(art, scale)
+    -- protected buttons hang off the art, so its scale only changes out of combat
+    if art:GetScale() ~= scale and AB.CanAnchor(art) then
+        Raw.SetScale(art, scale)
+    end
+
+    -- Each bar is placed twice: its Blizzard container (so Edit Mode boxes and
+    -- Blizzard's own bookkeeping line up) and its buttons, which are anchored
+    -- to the art directly and therefore survive Blizzard's in-combat re-stack
+    -- of the containers (see Buttons.Anchor).
 
     -- MainMenuBar.xml / ActionBarFrame.xml: ActionButton1 at BOTTOMLEFT of MainMenuBarArtFrame 8,4
     if AB.CanAnchor(MainActionBar) then
@@ -179,36 +189,47 @@ function AB.Position()
         Raw.ClearAllPoints(MainActionBar)
         Raw.SetPoint(MainActionBar, "BOTTOMLEFT", art, "BOTTOMLEFT", MAIN_BAR_X, MAIN_BAR_Y)
     end
+    AB.Buttons.Anchor(MainActionBar, "BOTTOMLEFT", art, "BOTTOMLEFT", MAIN_BAR_X, MAIN_BAR_Y)
 
     -- MultiActionBars.xml: MultiBarBottomLeft BOTTOMLEFT to ActionButton1 TOPLEFT 0,17
     -- (UIParent.lua: baseY 17, reputation +9, maxLevel -5)
+    local yBottom = MAIN_BAR_Y + AB.BUTTON + 17 + yStatus
     if AB.CanAnchor(MultiBarBottomLeft) then
         Raw.SetScale(MultiBarBottomLeft, scale)
         Raw.ClearAllPoints(MultiBarBottomLeft)
-        Raw.SetPoint(MultiBarBottomLeft, "BOTTOMLEFT", art, "BOTTOMLEFT", 8, 4 + AB.BUTTON + 17 + yStatus)
+        Raw.SetPoint(MultiBarBottomLeft, "BOTTOMLEFT", art, "BOTTOMLEFT", MAIN_BAR_X, yBottom)
     end
+    AB.Buttons.Anchor(MultiBarBottomLeft, "BOTTOMLEFT", art, "BOTTOMLEFT", MAIN_BAR_X, yBottom)
 
-    -- MultiActionBars.xml: MultiBarBottomRight LEFT to MultiBarBottomLeft RIGHT 10,0
-    if MultiBarBottomLeft and AB.CanAnchor(MultiBarBottomRight) then
+    -- MultiActionBars.xml: MultiBarBottomRight LEFT to MultiBarBottomLeft (500 wide) RIGHT 10,0.
+    -- Anchored to the art rather than to MultiBarBottomLeft, so Blizzard moving
+    -- that bar in combat cannot drag this one along.
+    local xBottomRight = MAIN_BAR_X + MULTIBAR_LENGTH + 10
+    if AB.CanAnchor(MultiBarBottomRight) then
         Raw.SetScale(MultiBarBottomRight, scale)
         Raw.ClearAllPoints(MultiBarBottomRight)
-        Raw.SetPoint(MultiBarBottomRight, "LEFT", MultiBarBottomLeft, "RIGHT", 10, 0)
+        Raw.SetPoint(MultiBarBottomRight, "BOTTOMLEFT", art, "BOTTOMLEFT", xBottomRight, yBottom)
     end
+    AB.Buttons.Anchor(MultiBarBottomRight, "BOTTOMLEFT", art, "BOTTOMLEFT", xBottomRight, yBottom)
 
     -- MultiActionBars.xml: MultiBarRight (38x500, buttons from TOPRIGHT) at BOTTOMRIGHT -7,98,
     -- so the first button's top edge sits at 598 from the screen bottom.
+    local yRight = 98 + MULTIBAR_LENGTH
     if AB.CanAnchor(MultiBarRight) then
         Raw.SetScale(MultiBarRight, scale)
         Raw.ClearAllPoints(MultiBarRight)
-        Raw.SetPoint(MultiBarRight, "TOPRIGHT", UIParent, "BOTTOMRIGHT", -7, 98 + 500)
+        Raw.SetPoint(MultiBarRight, "TOPRIGHT", UIParent, "BOTTOMRIGHT", -7, yRight)
     end
+    AB.Buttons.Anchor(MultiBarRight, "TOPRIGHT", UIParent, "BOTTOMRIGHT", -7, yRight)
 
-    -- MultiActionBars.xml: MultiBarLeft TOPRIGHT to MultiBarRight TOPLEFT -5,0
-    if MultiBarRight and AB.CanAnchor(MultiBarLeft) then
+    -- MultiActionBars.xml: MultiBarLeft TOPRIGHT to MultiBarRight (38 wide) TOPLEFT -5,0
+    local xLeft = -7 - MULTIBAR_THICKNESS - 5
+    if AB.CanAnchor(MultiBarLeft) then
         Raw.SetScale(MultiBarLeft, scale)
         Raw.ClearAllPoints(MultiBarLeft)
-        Raw.SetPoint(MultiBarLeft, "TOPRIGHT", MultiBarRight, "TOPLEFT", -5, 0)
+        Raw.SetPoint(MultiBarLeft, "TOPRIGHT", UIParent, "BOTTOMRIGHT", xLeft, yRight)
     end
+    AB.Buttons.Anchor(MultiBarLeft, "TOPRIGHT", UIParent, "BOTTOMRIGHT", xLeft, yRight)
 
     -- BonusActionBarFrame.xml: ShapeshiftBarFrame BOTTOMLEFT to MainMenuBar TOPLEFT 30,0;
     -- ShapeshiftButton1 at 11,3 inside. UIParent.lua: bottomLeft +45, reputation +9, maxLevel -5.
@@ -221,6 +242,7 @@ function AB.Position()
         Raw.ClearAllPoints(StanceBar)
         Raw.SetPoint(StanceBar, "BOTTOMLEFT", art, "BOTTOMLEFT", 30 + 11, stanceY)
     end
+    AB.Buttons.Anchor(StanceBar, "BOTTOMLEFT", art, "BOTTOMLEFT", 30 + 11, stanceY)
     AB.UpdateStanceArt(stanceY)
 
     -- PetActionBarFrame.xml: PetActionBarFrame (509x43) TOPLEFT to MainMenuBar BOTTOMLEFT 36,PETACTIONBAR_YPOS;
@@ -243,6 +265,7 @@ function AB.Position()
         Raw.ClearAllPoints(PetActionBar)
         Raw.SetPoint(PetActionBar, "BOTTOMLEFT", art, "BOTTOMLEFT", petX + 36, petY - 43 + 2)
     end
+    AB.Buttons.Anchor(PetActionBar, "BOTTOMLEFT", art, "BOTTOMLEFT", petX + 36, petY - 43 + 2)
     AB.UpdatePetArt(petX, petY)
 
     if AB.StatusBars then
@@ -488,7 +511,7 @@ function AB:Diag()
         local protected = bar:IsProtected()
         local ok, default = pcall(bar.IsInDefaultPosition, bar)
         ns.Print(
-            "  %-20s shown=%s %s -> %s %s (%.1f, %.1f) size %.0fx%.0f protected=%s default=%s",
+            "  %-20s shown=%s %s -> %s %s (%.1f, %.1f) size %.0fx%.0f protected=%s default=%s buttonsOnArt=%s",
             bar:GetName(),
             tostring(shown(bar)),
             tostring(point),
@@ -499,7 +522,8 @@ function AB:Diag()
             bar:GetWidth(),
             bar:GetHeight(),
             tostring(protected),
-            ok and tostring(default) or "?"
+            ok and tostring(default) or "?",
+            tostring(AB.Buttons.Anchored(bar))
         )
     end
     -- micro buttons: the modern group's art sizes, for "icon too big" reports

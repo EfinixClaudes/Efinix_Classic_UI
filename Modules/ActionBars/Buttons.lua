@@ -285,6 +285,73 @@ function Buttons.LayoutBar(bar)
     end
 end
 
+---------------------------------------------------------------------------
+-- Button anchors. Every button is anchored to the bar art (or UIParent)
+-- itself, never to its Blizzard bar. Edit Mode re-stacks the bottom bars
+-- in combat whenever the button grid shows (dragging anything) or a bar's
+-- visibility changes (EditModeActionBarMixin:UpdateVisibility ->
+-- UpdateBottomActionBarPositions, offsets 22 and 606 from the main bar);
+-- we may not anchor those bars back until the fight ends. Blizzard only
+-- ever anchors a button once, to its container's CENTER at load
+-- (ActionBar.lua ActionBar_OnLoad), so a button anchored elsewhere stays
+-- put while its container moves. Buttons are protected: the anchors are
+-- applied out of combat and queued otherwise.
+---------------------------------------------------------------------------
+local anchors = setmetatable({}, { __mode = "k" }) -- bar -> anchor
+
+local function applyAnchors(bar)
+    local anchor = anchors[bar]
+    if not anchor then
+        return
+    end
+    local layout = layoutFor(bar)
+    local stride = layout.size + layout.spacing
+    for i, button in ipairs(bar.actionButtons or {}) do
+        Raw.ClearAllPoints(button)
+        if layout.horizontal then
+            Raw.SetPoint(
+                button,
+                anchor.point,
+                anchor.relativeTo,
+                anchor.relativePoint,
+                anchor.x + (i - 1) * stride,
+                anchor.y
+            )
+        else
+            Raw.SetPoint(
+                button,
+                anchor.point,
+                anchor.relativeTo,
+                anchor.relativePoint,
+                anchor.x,
+                anchor.y - (i - 1) * stride
+            )
+        end
+    end
+end
+
+-- point/x/y describe the first button; horizontal bars grow to the right
+-- of it, vertical bars downwards, in the bar's 1.12 stride.
+function Buttons.Anchor(bar, point, relativeTo, relativePoint, x, y)
+    if not bar or not relativeTo then
+        return
+    end
+    anchors[bar] = { point = point, relativeTo = relativeTo, relativePoint = relativePoint, x = x, y = y }
+    Combat.Run("buttonanchor:" .. tostring(bar:GetName() or bar), function()
+        applyAnchors(bar)
+    end)
+end
+
+function Buttons.Anchored(bar)
+    local button = bar and bar.actionButtons and bar.actionButtons[1]
+    local anchor = anchors[bar]
+    if not button or not anchor then
+        return false
+    end
+    local _, relativeTo = button:GetPoint(1)
+    return relativeTo == anchor.relativeTo
+end
+
 function Buttons.SetupBar(bar)
     local layout = layoutFor(bar)
     for _, button in ipairs(bar.actionButtons or {}) do
