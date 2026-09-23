@@ -195,20 +195,39 @@ local function talentIcon(definition)
 end
 
 -- Node positions are tree coordinates (units of 1/10 px in Blizzard's own
--- layout); within one group the distinct X and Y values are the columns and
--- tiers. Rounded against the smallest step so uneven spacing still lands.
-local function gridIndex(value, sorted)
-    if #sorted <= 1 then
-        return 1
+-- layout); within one group the distinct X values are the columns and the
+-- distinct Y values the tiers. A node may sit a few units off its column,
+-- so sorted values are clustered: a gap smaller than 40% of the widest gap
+-- belongs to the same column or tier.
+local function clusters(sorted)
+    local list = {}
+    if #sorted == 0 then
+        return list
     end
-    local step = math.huge
+    local widest = 0
     for i = 2, #sorted do
-        step = math.min(step, sorted[i] - sorted[i - 1])
+        widest = math.max(widest, sorted[i] - sorted[i - 1])
     end
-    if step <= 0 then
-        return 1
+    local current = { min = sorted[1], max = sorted[1] }
+    list[1] = current
+    for i = 2, #sorted do
+        if sorted[i] - sorted[i - 1] > widest * 0.4 then
+            current = { min = sorted[i], max = sorted[i] }
+            list[#list + 1] = current
+        else
+            current.max = sorted[i]
+        end
     end
-    return math.floor((value - sorted[1]) / step + 0.5) + 1
+    return list
+end
+
+local function gridIndex(value, groups)
+    for index, cluster in ipairs(groups) do
+        if value <= cluster.max then
+            return index
+        end
+    end
+    return math.max(#groups, 1)
 end
 
 local placeUngrouped -- defined below Rebuild's helpers, used by Rebuild
@@ -324,6 +343,12 @@ function Talents.Rebuild()
     if treeCurrency and treeCurrency[1] then
         pointsLeft = tonumber(plain(treeCurrency[1].quantity)) or 0
     end
+    for _, groupInfo in ipairs(currency) do
+        local first = groupInfo.currencyInfos and groupInfo.currencyInfos[1]
+        if first then
+            pointsLeft = math.max(pointsLeft, tonumber(plain(first.quantity)) or 0)
+        end
+    end
 
     -- nodes: matched to a tree by any of their group ids; nodes without a
     -- matching group are placed by X position (see placeUngrouped)
@@ -383,10 +408,10 @@ function Talents.Rebuild()
             xs[#xs + 1] = node.info.posX
             ys[#ys + 1] = node.info.posY
         end
-        xs, ys = sortedUnique(xs), sortedUnique(ys)
+        local columns, tiers = clusters(sortedUnique(xs)), clusters(sortedUnique(ys))
         for _, node in ipairs(tree.nodes) do
-            node.column = math.max(1, math.min(NUM_COLUMNS, gridIndex(node.info.posX, xs)))
-            node.tier = math.max(1, math.min(MAX_TIERS, gridIndex(node.info.posY, ys)))
+            node.column = math.max(1, math.min(NUM_COLUMNS, gridIndex(node.info.posX, columns)))
+            node.tier = math.max(1, math.min(MAX_TIERS, gridIndex(node.info.posY, tiers)))
         end
         table.sort(tree.nodes, function(a, b)
             if a.tier ~= b.tier then
@@ -759,6 +784,9 @@ local function showTooltip(button)
     if node.info.canPurchaseRank and pointsLeft > 0 then
         GameTooltip:AddLine("Click to learn", 0.1, 1, 0.1)
     end
+    if node.info.canPurchaseRank and pointsLeft <= 0 and node.rank < node.maxRank then
+        GameTooltip:AddLine("No talent points to spend", 0.5, 0.5, 0.5)
+    end
     GameTooltip:Show()
 end
 
@@ -904,7 +932,7 @@ local function createFrame()
 
     -- Blizzard_TalentUI.xml chrome
     local function chrome(key, width, height, point, x, y)
-        local t = frame:CreateTexture(nil, "BORDER")
+        local t = frame:CreateTexture(nil, "BACKGROUND", nil, -1)
         t:SetTexture(tex(key))
         t:SetSize(width, height)
         t:SetPoint(point, frame, point, x, y)
@@ -916,25 +944,25 @@ local function createFrame()
     chrome("botLeft", 256, 256, "BOTTOMLEFT", 2, -1)
     chrome("botRight", 128, 256, "BOTTOMRIGHT", 2, -1)
 
-    frame.Portrait = frame:CreateTexture(nil, "BACKGROUND")
+    frame.Portrait = frame:CreateTexture(nil, "BACKGROUND", nil, -2)
     frame.Portrait:SetSize(60, 60)
     frame.Portrait:SetPoint("TOPLEFT", frame, "TOPLEFT", 7, -6)
 
     -- tree painting: 256x256 at 23,-77, 64 wide strip right of it, 128 tall strip below
     frame.Background = {}
-    local bg = frame:CreateTexture(nil, "BACKGROUND")
+    local bg = frame:CreateTexture(nil, "BORDER")
     bg:SetSize(256, 256)
     bg:SetPoint("TOPLEFT", frame, "TOPLEFT", 23, -77)
     frame.Background.topLeft = bg
-    bg = frame:CreateTexture(nil, "BACKGROUND")
+    bg = frame:CreateTexture(nil, "BORDER")
     bg:SetSize(64, 256)
     bg:SetPoint("TOPLEFT", frame.Background.topLeft, "TOPRIGHT", 0, 0)
     frame.Background.topRight = bg
-    bg = frame:CreateTexture(nil, "BACKGROUND")
+    bg = frame:CreateTexture(nil, "BORDER")
     bg:SetSize(256, 128)
     bg:SetPoint("TOPLEFT", frame.Background.topLeft, "BOTTOMLEFT", 0, 0)
     frame.Background.bottomLeft = bg
-    bg = frame:CreateTexture(nil, "BACKGROUND")
+    bg = frame:CreateTexture(nil, "BORDER")
     bg:SetSize(64, 128)
     bg:SetPoint("TOPLEFT", frame.Background.topLeft, "BOTTOMRIGHT", 0, 0)
     frame.Background.bottomRight = bg
@@ -1164,8 +1192,10 @@ function Talents.Update()
 
             -- TalentFrame_Update: green while learnable and not maxed, gold when maxed,
             -- grey when the tier, points or prerequisites are missing
+            -- TalentFrame_Update: with no points to spend, unlearned talents are grey
+            -- (forceDesaturated); the client's purchase flag alone ignores that
             local info = node.info
-            local learnable = info.canPurchaseRank == true
+            local learnable = info.canPurchaseRank == true and pointsLeft > 0
             local available = learnable or node.rank > 0
             if available then
                 button.Icon:SetDesaturated(false)
@@ -1199,7 +1229,7 @@ function Talents.Update()
         -- prerequisite lines, drawn after every id is placed
         for _, node in ipairs(tree.nodes) do
             for _, prereq in ipairs(node.prereqs) do
-                local met = prereq.active and (node.info.canPurchaseRank == true or node.rank > 0)
+                local met = prereq.active and ((node.info.canPurchaseRank == true and pointsLeft > 0) or node.rank > 0)
                 drawLines(node.tier, node.column, prereq.node.tier, prereq.node.column, met)
             end
         end
@@ -1343,13 +1373,27 @@ function Talents:Diag()
             tostring(skipped.selection),
             tostring(skipped.ungrouped)
         )
+        local groupIDs = {}
+        for _, info in ipairs(groups) do
+            groupIDs[#groupIDs + 1] = info.groupID
+        end
+        local currency = C_Traits.GetGroupCurrencyInfo(configID, groupIDs) or {}
         for i, info in ipairs(groups) do
+            local quantity, spent = "?", "?"
+            for _, groupInfo in ipairs(currency) do
+                local first = groupInfo.currencyInfos and groupInfo.currencyInfos[1]
+                if groupInfo.traitNodeGroupID == info.groupID and first then
+                    quantity, spent = tostring(first.quantity), tostring(first.spent)
+                end
+            end
             ns.Print(
-                "  group %d id=%s order=%s name=%s",
+                "  group %d id=%s order=%s name=%s points=%s spent=%s",
                 i,
                 tostring(info.groupID),
                 tostring(info.orderIndex),
-                tostring(info.displayName)
+                tostring(info.displayName),
+                quantity,
+                spent
             )
         end
         for i = 1, math.min(#nodes, 12) do
