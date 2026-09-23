@@ -63,11 +63,14 @@ COMMANDS  (type them in the chat box)
 GOOD TO KNOW
 ------------
 
-Micro menu: the eight 2006 buttons sit where they always did. The menus that did
-not exist back then (professions, guild, group finder, collections, adventure
-guide, housing, shop) are on a second row to the right of the right gryphon,
-drawn as old-style micro buttons with a 2006 icon each, because the old bar has
-no room for them between the micro menu and the bags.
+Micro menu: all sixteen menus sit in one row of old-style micro buttons. The
+eight 2006 ones look as they did; the menus that did not exist back then
+(professions, guild, group finder, collections, adventure guide, housing, shop)
+get the old character-button frame with a 2006 icon each. The bar art grows by
+the width of those eight buttons so the bags keep their old spacing. Untick
+"All menus in one micro menu row" in the options (then Save & Reload) for the
+exact 1024-wide 2006 bar; the extra menus then sit in a second group to the
+right of the right gryphon.
 Minimap: the clock, the calendar button and the addon button are hidden like in
 2006. Click the sun/moon icon at the top right of the minimap to open the calendar.
 The tracking icon left of the minimap still opens the tracking menu.

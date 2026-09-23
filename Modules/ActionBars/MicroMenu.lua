@@ -7,11 +7,13 @@ local _, ns = ...
 -- Forever has no Socials or World Map micro button, so those two are ours.
 -- Buttons for systems Vanilla did not have (professions book, legacy,
 -- housing, guild/communities, group finder, collections, adventure guide,
--- shop) stay visible in a second group to the right of the right gryphon,
--- because the Vanilla bar has no free pixels between the micro menu and the
--- bag buttons. They wear the 1.12 character button frame (the one empty
--- micro button frame Vanilla shipped: UI-MicroButtonCharacter-Up, with the
--- portrait window left dark) and a Vanilla-era icon in the portrait window.
+-- shop) stay visible. They wear the 1.12 character button frame (the one
+-- empty micro button frame Vanilla shipped: UI-MicroButtonCharacter-Up, with
+-- the portrait window left dark) and a Vanilla-era icon in that window. By
+-- default they continue the micro menu row and the bar art grows to fit
+-- (ActionBars.MICRO_EXTRA); with that option off they form a second group
+-- to the right of the right gryphon, since the 1024 bar has no free pixels
+-- between the micro menu and the bag buttons.
 local Raw = ns.Raw
 local Assets = ns.Assets
 local AB = ns.ActionBars
@@ -419,8 +421,11 @@ function MicroMenu.Position()
         end
     end
 
-    -- Second group: Forever-only systems, right of the right gryphon
-    previous = nil
+    -- Forever-only systems: on the longer bar they continue the row, on the
+    -- 1.12-wide bar they form a second group right of the right gryphon
+    if AB.extraWidth == 0 then
+        previous = nil
+    end
     for _, entry in ipairs(MODERN) do
         local button = _G[entry.frame]
         if button and Raw.IsShown(button) then

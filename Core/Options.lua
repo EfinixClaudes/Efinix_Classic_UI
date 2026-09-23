@@ -129,7 +129,7 @@ end
 
 local function createFrame()
     frame = CreateFrame("Frame", "FCUI_OptionsFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(WIDTH, 52 + (#MODULES + 1) * ROW + 150 + 2 * SLIDER_ROW)
+    frame:SetSize(WIDTH, 52 + (#MODULES + 2) * ROW + 150 + 2 * SLIDER_ROW)
     frame:SetPoint("CENTER")
     frame:SetFrameStrata("DIALOG")
     frame:SetToplevel(true)
@@ -170,7 +170,24 @@ local function createFrame()
     end)
     frame.DarkMode = dark
 
-    local y = -52 - (#MODULES + 1) * ROW - 24
+    local row = CreateFrame("CheckButton", "FCUI_Option_MicroMenuRow", frame, "UICheckButtonTemplate")
+    row:SetSize(24, 24)
+    row:SetPoint("TOPLEFT", frame, "TOPLEFT", 24, -52 - (#MODULES + 1) * ROW)
+    local rowText = row.Text or row.text or _G[row:GetName() .. "Text"]
+    if rowText then
+        rowText:SetFontObject(GameFontNormal)
+        rowText:SetText("All menus in one micro menu row (bar grows; needs reload)")
+        rowText:ClearAllPoints()
+        rowText:SetPoint("LEFT", row, "RIGHT", 4, 0)
+    end
+    row:SetScript("OnClick", function(self)
+        ns.db.microMenuRow = self:GetChecked() == true
+        ns.DB.Flush()
+        ns.Print("one micro menu row %s, takes effect after Save & Reload", ns.db.microMenuRow and "on" or "off")
+    end)
+    frame.MicroMenuRow = row
+
+    local y = -52 - (#MODULES + 2) * ROW - 24
     frame.Scale = createSlider(frame, "FCUI_OptionScale", "Bar scale", 0.5, 2, 0.05, y, function()
         return ns.db.scale or 1
     end, function(value)
@@ -263,6 +280,9 @@ function Options.Refresh()
     end
     if frame.DarkMode then
         frame.DarkMode:SetChecked(ns.Dark.Enabled())
+    end
+    if frame.MicroMenuRow then
+        frame.MicroMenuRow:SetChecked(ns.db.microMenuRow == true)
     end
     if frame.Scale then
         frame.Scale:Refresh()

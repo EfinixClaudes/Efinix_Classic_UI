@@ -198,15 +198,26 @@ local function decorate(container)
             { 0.29296875, 0.33203125 },
             { 0.04296875, 0.08203125 },
         }
-        local offsets = { -384, -128, 128, 384 }
+        -- from the left edge, the bag segment pushed right by the longer micro menu row
+        local extra = AB.extraWidth or 0
+        local offsets = { 0, 256, 512, 768 + extra }
         for i = 1, 4 do
             local tex = container:CreateTexture(nil, "OVERLAY")
             tex:SetTexture(sheet)
             tex:SetSize(256, 10)
-            tex:SetPoint("BOTTOM", container, "BOTTOM", offsets[i], 3)
+            tex:SetPoint("BOTTOMLEFT", container, "BOTTOMLEFT", offsets[i], 3)
             tex:SetTexCoord(0, 1, coords[i][1], coords[i][2])
             ns.Dark.Tint(tex)
             art.xp[i] = tex
+        end
+        if extra > 0 then
+            local filler = container:CreateTexture(nil, "OVERLAY")
+            filler:SetTexture(sheet)
+            filler:SetSize(extra, 10)
+            filler:SetPoint("BOTTOMLEFT", container, "BOTTOMLEFT", 768, 3)
+            filler:SetTexCoord(0, extra / 256, coords[3][1], coords[3][2])
+            ns.Dark.Tint(filler)
+            art.xp[#art.xp + 1] = filler
         end
     end
 
@@ -233,6 +244,18 @@ local function decorate(container)
             ns.Dark.Tint(tex)
             art.rep[i] = tex
             previous = tex
+        end
+        local extra = AB.extraWidth or 0
+        if extra > 0 then
+            local filler = container:CreateTexture(nil, "OVERLAY")
+            filler:SetTexture(repSheet)
+            filler:SetSize(extra, 11)
+            filler:SetPoint("LEFT", art.rep[3], "RIGHT")
+            filler:SetTexCoord(0, extra / 256, coords[3][1], coords[3][2])
+            ns.Dark.Tint(filler)
+            art.rep[4]:ClearAllPoints()
+            art.rep[4]:SetPoint("LEFT", filler, "RIGHT")
+            art.rep[#art.rep + 1] = filler
         end
     end
 
@@ -263,7 +286,7 @@ local function createMaxLevelArt()
         return
     end
     local frame = CreateFrame("Frame", nil, AB.frame)
-    frame:SetSize(1024, 7)
+    frame:SetSize(AB.BarWidth(), 7)
     frame:SetPoint("TOP", AB.frame, "TOP", 0, -11)
     local coords = {
         { 0, 0.21875 },
@@ -272,6 +295,7 @@ local function createMaxLevelArt()
         { 0.75, 0.96875 },
     }
     local previous
+    local pieces = {}
     for i = 1, 4 do
         local t = frame:CreateTexture(nil, "BACKGROUND")
         t:SetTexture(tex)
@@ -279,11 +303,23 @@ local function createMaxLevelArt()
         if previous then
             t:SetPoint("LEFT", previous, "RIGHT")
         else
-            t:SetPoint("BOTTOM", frame, "TOP", -384, 0)
+            t:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 0)
         end
         t:SetTexCoord(0, 1, coords[i][1], coords[i][2])
         ns.Dark.Tint(t)
+        pieces[i] = t
         previous = t
+    end
+    local extra = AB.extraWidth or 0
+    if extra > 0 then
+        local filler = frame:CreateTexture(nil, "BACKGROUND")
+        filler:SetTexture(tex)
+        filler:SetSize(extra, 7)
+        filler:SetPoint("LEFT", pieces[3], "RIGHT")
+        filler:SetTexCoord(0, extra / 256, coords[3][1], coords[3][2])
+        ns.Dark.Tint(filler)
+        pieces[4]:ClearAllPoints()
+        pieces[4]:SetPoint("LEFT", filler, "RIGHT")
     end
     frame:Hide()
     StatusBars.maxLevelArt = frame
@@ -305,6 +341,7 @@ function StatusBars.Position()
     local art = AB.frame
     local scale = ns.db.scale or 1
     local xp, rep = StatusBars.Slots()
+    local width = AB.BarWidth()
 
     for _, container in ipairs(containers()) do
         if AB.CanAnchor(container) then
@@ -313,15 +350,15 @@ function StatusBars.Position()
             Raw.ClearAllPoints(container)
             if container == rep then
                 -- ReputationWatchBar: 1024x11, BOTTOM to MainMenuBar TOP 0,-3
-                Raw.SetSize(container, 1024, 11)
+                Raw.SetSize(container, width, 11)
                 Raw.SetPoint(container, "BOTTOM", art, "TOP", 0, -3)
-                sizeInnerBars(container, 1024, 11)
+                sizeInnerBars(container, width, 11)
                 setArtMode(deco, "rep")
             else
                 -- MainMenuExpBar: 1024x13 at TOP of MainMenuBar
-                Raw.SetSize(container, 1024, 13)
+                Raw.SetSize(container, width, 13)
                 Raw.SetPoint(container, "TOP", art, "TOP", 0, 0)
-                sizeInnerBars(container, 1024, 13)
+                sizeInnerBars(container, width, 13)
                 setArtMode(deco, "xp")
             end
         end

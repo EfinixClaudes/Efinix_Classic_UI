@@ -14,6 +14,14 @@ ns.ActionBars = AB
 
 -- Layout constants (1.12 FrameXML)
 AB.BAR_WIDTH = 1024 -- MainMenuBar.xml: MainMenuBar 1024x53
+-- All menus in one micro menu row: the bar grows by the eight Forever-only
+-- micro buttons (29 px overlapping 3, MainMenuBarMicroButtons.xml) so the
+-- row and the bag buttons keep their 1.12 spacing. Set at MainBar.Create.
+AB.MICRO_EXTRA = 8 * 26
+AB.extraWidth = 0
+function AB.BarWidth()
+    return AB.BAR_WIDTH + (AB.extraWidth or 0)
+end
 AB.BAR_HEIGHT = 53
 AB.BUTTON = 36 -- ActionButtonTemplate.xml: 36x36
 AB.BUTTON_SPACING = 6 -- ActionBarFrame.xml: ActionButton2 LEFT of ActionButton1 RIGHT +6

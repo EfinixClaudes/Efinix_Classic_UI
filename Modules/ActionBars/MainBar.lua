@@ -17,7 +17,9 @@ local PERFORMANCEBAR_UPDATE_INTERVAL = 10
 
 function MainBar.Create()
     local art = CreateFrame("Frame", "FCUI_MainMenuBar", UIParent)
-    art:SetSize(AB.BAR_WIDTH, AB.BAR_HEIGHT) -- MainMenuBar.xml: 1024x53
+    AB.extraWidth = ns.db.microMenuRow and AB.MICRO_EXTRA or 0
+    local extra = AB.extraWidth
+    art:SetSize(AB.BAR_WIDTH + extra, AB.BAR_HEIGHT) -- MainMenuBar.xml: 1024x53 (+ the longer micro menu row)
     art:SetPoint("BOTTOM") -- MainMenuBar.xml: <Anchor point="BOTTOM"/>
     -- Blizzard bars live on MEDIUM strata; LOW keeps our art underneath the buttons.
     art:SetFrameStrata("LOW")
@@ -34,20 +36,33 @@ function MainBar.Create()
             { 0.33203125, 0.5 },
             { 0.08203125, 0.25 },
         }
-        local offsets = { -384, -128, 128, 384 }
+        -- measured from the left edge: 0, 256, 512 (micro menu segment), 768 (bag
+        -- segment); the longer row pushes the bag segment right and the gap
+        -- repeats the start of the micro menu segment
+        local offsets = { 0, 256, 512, 768 + extra }
         art.Textures = {}
         for i = 1, 4 do
             local tex = art:CreateTexture(nil, "ARTWORK")
             tex:SetTexture(sheet)
             tex:SetSize(256, 43)
-            tex:SetPoint("BOTTOM", art, "BOTTOM", offsets[i], 0)
+            tex:SetPoint("BOTTOMLEFT", art, "BOTTOMLEFT", offsets[i], 0)
             tex:SetTexCoord(0, 1, coords[i][1], coords[i][2])
             ns.Dark.Tint(tex)
             art.Textures[i] = tex
         end
+        if extra > 0 then
+            local filler = art:CreateTexture(nil, "ARTWORK")
+            filler:SetTexture(sheet)
+            filler:SetSize(extra, 43)
+            filler:SetPoint("BOTTOMLEFT", art, "BOTTOMLEFT", 768, 0)
+            filler:SetTexCoord(0, extra / 256, coords[3][1], coords[3][2])
+            ns.Dark.Tint(filler)
+            art.Filler = filler
+        end
     end
 
     -- MainMenuBar.xml MainMenuBarLeftEndCap / RightEndCap: 128x128 at BOTTOM -544 / 544,
+    -- i.e. 32 px outside either edge of the 1024 bar (kept when the bar is longer),
     -- the right one mirrored (TexCoords left=1 right=0). 1.12 uses the Dwarf gryphon for
     -- both factions; the Horde wyvern only arrived with 2.0.
     local endcap = Assets.Get("MainBar.EndCap")
@@ -55,12 +70,12 @@ function MainBar.Create()
         art.LeftEndCap = art:CreateTexture(nil, "OVERLAY")
         art.LeftEndCap:SetTexture(endcap)
         art.LeftEndCap:SetSize(128, 128)
-        art.LeftEndCap:SetPoint("BOTTOM", art, "BOTTOM", -544, 0)
+        art.LeftEndCap:SetPoint("BOTTOM", art, "BOTTOMLEFT", -32, 0)
 
         art.RightEndCap = art:CreateTexture(nil, "OVERLAY")
         art.RightEndCap:SetTexture(endcap)
         art.RightEndCap:SetSize(128, 128)
-        art.RightEndCap:SetPoint("BOTTOM", art, "BOTTOM", 544, 0)
+        art.RightEndCap:SetPoint("BOTTOM", art, "BOTTOMRIGHT", 32, 0)
         art.RightEndCap:SetTexCoord(1, 0, 0, 1)
         ns.Dark.Tint(art.LeftEndCap)
         ns.Dark.Tint(art.RightEndCap)

@@ -7,6 +7,7 @@ local DEFAULTS = {
     version = 4,
     scale = 1,
     darkMode = false, -- frame art tinted dark grey (addon option)
+    microMenuRow = true, -- all menus in one micro menu row; the bar art grows to fit
     darkContrastPrevious = nil, -- questTextContrast cvar before dark mode set it to 4
     modules = {
         ActionBars = true,
