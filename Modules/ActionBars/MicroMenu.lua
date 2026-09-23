@@ -7,10 +7,11 @@ local _, ns = ...
 -- Forever has no Socials or World Map micro button, so those two are ours.
 -- Buttons for systems Vanilla did not have (professions book, legacy,
 -- housing, guild/communities, group finder, collections, adventure guide,
--- shop) stay visible: they get the classic 29x58 footprint and spacing with
--- their modern icons, in a second group to the right of the right gryphon,
+-- shop) stay visible in a second group to the right of the right gryphon,
 -- because the Vanilla bar has no free pixels between the micro menu and the
--- bag buttons.
+-- bag buttons. They wear the 1.12 character button frame (the one empty
+-- micro button frame Vanilla shipped: UI-MicroButtonCharacter-Up, with the
+-- portrait window left dark) and a Vanilla-era icon in the portrait window.
 local Raw = ns.Raw
 local Assets = ns.Assets
 local AB = ns.ActionBars
@@ -30,15 +31,18 @@ local CLASSIC = {
     { frame = "HelpMicroButton", asset = "Micro.Help" },
 }
 
+-- icon: a Vanilla-era spell/item icon that reads at 18x25 (all of these ship
+-- in every client since 1.x); the modern atlas art stays as the fallback.
+local ICONS = "Interface\\Icons\\"
 local MODERN = {
-    { frame = "ProfessionMicroButton", modern = true },
-    { frame = "GuildMicroButton", modern = true },
-    { frame = "LFDMicroButton", modern = true },
-    { frame = "LegacyMicroButton", modern = true },
-    { frame = "CollectionsMicroButton", modern = true },
-    { frame = "EJMicroButton", modern = true },
-    { frame = "HousingMicroButton", modern = true },
-    { frame = "StoreMicroButton", modern = true },
+    { frame = "ProfessionMicroButton", modern = true, icon = ICONS .. "Trade_BlackSmithing" },
+    { frame = "GuildMicroButton", modern = true, icon = ICONS .. "INV_Shield_04" },
+    { frame = "LFDMicroButton", modern = true, icon = ICONS .. "INV_Misc_GroupLooking" },
+    { frame = "LegacyMicroButton", modern = true, icon = ICONS .. "INV_Misc_Book_11" },
+    { frame = "CollectionsMicroButton", modern = true, icon = ICONS .. "Ability_Mount_RidingHorse" },
+    { frame = "EJMicroButton", modern = true, icon = ICONS .. "INV_Misc_Bone_HumanSkull_01" },
+    { frame = "HousingMicroButton", modern = true, icon = ICONS .. "INV_Misc_Rune_01" }, -- the hearthstone: home
+    { frame = "StoreMicroButton", modern = true, icon = ICONS .. "INV_Misc_Coin_02" },
 }
 
 -- MainMenuBar.xml: right gryphon spans 544-64 .. 544+64 from the bar centre,
@@ -95,6 +99,65 @@ local function applyModernTextures(button)
     end
 end
 
+-- Classic frame around a modern-only menu: character button frame, the
+-- menu's Vanilla icon where the portrait would be (18x25 at TOP 0,-28).
+local modernIcons = setmetatable({}, { __mode = "k" }) -- button -> our icon texture
+
+local function classicIconAvailable(entry)
+    if not entry.icon then
+        return false
+    end
+    if entry.iconExists == nil then
+        local exists = ns.Compat.TextureExists(entry.icon)
+        entry.iconExists = exists ~= false -- unknown counts as present; the client shows a green square if not
+    end
+    return entry.iconExists
+end
+
+local function applyClassicModernTextures(button, entry)
+    local up = Assets.Get("Micro.CharacterUp")
+    local down = Assets.Get("Micro.CharacterDown")
+    if not up or not classicIconAvailable(entry) then
+        applyModernTextures(button)
+        return
+    end
+    button:SetNormalTexture(up)
+    button:GetNormalTexture():SetAllPoints(button)
+    button:SetPushedTexture(down or up)
+    button:GetPushedTexture():SetAllPoints(button)
+    button:SetDisabledTexture(up)
+    local disabled = button:GetDisabledTexture()
+    disabled:SetAllPoints(button)
+    disabled:SetDesaturated(true)
+    -- the modern backdrop, shadow and alert-flash pieces
+    local pieces = { "Background", "PushedBackground", "Shadow", "PushedShadow", "FlashBorder", "FlashContent" }
+    for _, key in ipairs(pieces) do
+        if button[key] then
+            button[key]:SetAlpha(0)
+        end
+    end
+    local icon = modernIcons[button]
+    if not icon then
+        icon = button:CreateTexture(nil, "OVERLAY")
+        modernIcons[button] = icon
+    end
+    icon:SetTexture(entry.icon)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    icon:SetSize(18, 25)
+    icon:ClearAllPoints()
+    icon:SetPoint("TOP", button, "TOP", 0, -28)
+    icon:SetDesaturated(not button:IsEnabled())
+    icon:Show()
+end
+
+-- Pushed: the icon dims like the character portrait does (CharacterMicroButton_SetPushed)
+local function applyModernIconState(button, pushed)
+    local icon = modernIcons[button]
+    if icon then
+        icon:SetAlpha(pushed and 0.5 or 1)
+    end
+end
+
 function applyTextures(button)
     local entry = reskinned[button]
     if not entry or applying then
@@ -102,7 +165,14 @@ function applyTextures(button)
     end
     applying = true
     if entry.modern then
-        applyModernTextures(button)
+        applyClassicModernTextures(button, entry)
+        local highlight = Assets.Get("Micro.Hilight")
+        if highlight and modernIcons[button] then
+            button:SetHighlightTexture(highlight, "BLEND")
+            local tex = button:GetHighlightTexture()
+            tex:SetAllPoints(button)
+            tex:SetAlpha(1)
+        end
         applying = false
         return
     end
@@ -171,11 +241,9 @@ local function reskin(button, entry)
     Raw.SetHitRectInsets(button, 0, 0, 18, 0)
 
     -- Modern backdrop pieces; Blizzard toggles them in SetPushed/SetNormal so alpha 0 is the durable way
-    if not entry.modern then
-        for _, key in ipairs({ "Background", "PushedBackground", "Shadow", "PushedShadow" }) do
-            if button[key] then
-                button[key]:SetAlpha(0)
-            end
+    for _, key in ipairs({ "Background", "PushedBackground", "Shadow", "PushedShadow" }) do
+        if button[key] then
+            button[key]:SetAlpha(0)
         end
     end
     if button.PortraitMask and button.Portrait and button.Portrait.RemoveMaskTexture then
@@ -202,14 +270,33 @@ local function reskin(button, entry)
         applyTextures(self)
         if entry.character then
             applyPortrait(self, true)
+        elseif entry.modern then
+            applyModernIconState(self, true)
         end
     end)
     AB.Hook(button, "SetNormal", function(self)
         applyTextures(self)
         if entry.character then
             applyPortrait(self, false)
+        elseif entry.modern then
+            applyModernIconState(self, false)
         end
     end)
+    -- Enable/Disable (e.g. the shop in combat): the icon greys out with the frame
+    if entry.modern then
+        AB.Hook(button, "Enable", function(self)
+            local icon = modernIcons[self]
+            if icon then
+                icon:SetDesaturated(false)
+            end
+        end)
+        AB.Hook(button, "Disable", function(self)
+            local icon = modernIcons[self]
+            if icon then
+                icon:SetDesaturated(true)
+            end
+        end)
+    end
 end
 
 ---------------------------------------------------------------------------
