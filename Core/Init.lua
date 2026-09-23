@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-23.47" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-23.48" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {

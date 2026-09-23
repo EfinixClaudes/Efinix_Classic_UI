@@ -253,9 +253,12 @@ local function layoutTracking()
     if not tracking then
         return
     end
+    -- Minimap.xml 1.12: MiniMapTrackingFrame 33x33 at TOPLEFT -15,0 of the cluster,
+    -- where it overlaps the buffs on this cluster; it sits on the left ring of the
+    -- round map instead, directly above the mail icon (mail is at -21,-38)
     Raw.SetSize(tracking, 33, 33)
     Raw.ClearAllPoints(tracking)
-    Raw.SetPoint(tracking, "TOPLEFT", MinimapCluster, "TOPLEFT", -15, 0)
+    Raw.SetPoint(tracking, "TOPLEFT", Minimap, "TOPLEFT", -21, -3)
     if tracking.Background then
         tracking.Background:Hide()
     end
