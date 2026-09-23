@@ -23,6 +23,7 @@ local DEFAULTS = {
         LootFrame = true,
         SpellBook = true,
         Talents = true,
+        QuestWatch = true,
         Bags = true,
         Vendor = true,
     },
@@ -34,6 +35,8 @@ local DEFAULTS = {
     swingTimer = { previous = nil },
     -- UnitFrames: player-chosen frame positions, name -> {point, x, y} on UIParent
     positions = {},
+    -- QuestWatch: folded zone headers, zone name -> true
+    questWatch = { collapsed = {} },
     bags = {
         columns = 10,
         bankColumns = 14,

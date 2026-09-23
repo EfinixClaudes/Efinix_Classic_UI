@@ -24,6 +24,7 @@ local MODULES = {
     { key = "LootFrame", label = "Loot window" },
     { key = "SpellBook", label = "Spellbook" },
     { key = "Talents", label = "Talent window" },
+    { key = "QuestWatch", label = "Quest watch list (zones fold, replaces the objective tracker)" },
     { key = "Bags", label = "Bag window (all bags in one)" },
     { key = "Vendor", label = "Vendor: sell junk and repair while holding Shift" },
 }

@@ -49,6 +49,7 @@ Modules\RaidFrames\RaidFrames.lua
 Modules\Panels\Loot.lua
 Modules\Panels\SpellBook.lua
 Modules\Panels\Talents.lua
+Modules\Panels\QuestWatch.lua
 
 Modules\Bags\Bags.lua
 Modules\Bags\Blizzard.lua

@@ -55,7 +55,8 @@ COMMANDS  (type them in the chat box)
                             Also a checkbox in the options window.
 /fcui disable Bags          turns a part off. Parts: ActionBars, UnitFrames, CastBar,
                             SwingTimer, Minimap, Auras, Chat, Tooltip, Nameplates,
-                            RaidFrames, LootFrame, SpellBook, Talents, Bags, Vendor.
+                            RaidFrames, LootFrame, SpellBook, Talents, QuestWatch,
+                            Bags, Vendor.
 /fcui enable Bags           turns it on again. Both need /reload afterwards.
 /fcui reset                 forgets all settings, then /reload
 
@@ -108,6 +109,12 @@ talent learns it at once. If the game cannot apply it right away (in combat,
 while casting) the point stays placed and an Apply button appears; right-click
 takes such an unapplied point back. Dual talent specs are not shown yet; the
 game's own window still has them (turn the Talents part off for that).
+Quest watch: the tracked quests are a plain text list under the minimap as in
+2006, yellow titles with their objectives below, finished objectives greyed.
+They are grouped under their quest-log zone headers, and each zone folds with
+the old plus/minus button (the folded zones are remembered). Click a quest to
+open it in the quest log, shift-click or right-click to stop watching it. The
+game's boxed objective tracker is hidden while this part runs.
 Loot window: the small 2006 loot panel with four item slots and page arrows
 opens at the top left, or under the mouse if you have that option turned on.
 The options window (/fcui) lets you turn the spellbook, talent and loot windows
