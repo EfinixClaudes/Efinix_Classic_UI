@@ -67,7 +67,9 @@ Micro menu: all sixteen menus sit in one row of old-style micro buttons. The
 eight 2006 ones look as they did; the menus that did not exist back then
 (professions, guild, group finder, collections, adventure guide, housing, shop)
 get the old character-button frame with a 2006 icon each. The bar art grows by
-the width of those eight buttons so the bags keep their old spacing. Untick
+exactly the width of the extra buttons your game shows, so the bags keep their
+old spacing, and the upper right action bar ends at the bar's end as it always
+did. A menu the game has switched off on this realm is left out. Untick
 "All menus in one micro menu row" in the options (then Save & Reload) for the
 exact 1024-wide 2006 bar; the extra menus then sit in a second group to the
 right of the right gryphon.
@@ -84,7 +86,9 @@ switches the game's swing timer setting back to what it was. Edit Mode lets you
 choose whether the bars show always or only in combat.
 Nameplates: the addon draws the flat 2006 plate (coloured bar, thin black frame,
 level to the right) and switches off the game's shrinking of far-away plates, as
-there was none back then. "Nameplate size" in the options makes them bigger or
+there was none back then. Enemy players' bars show their class colour (the
+game's own "class colour" nameplate setting is switched on for you and put back
+when the part is turned off). "Nameplate size" in the options makes them bigger or
 smaller. Turning the Nameplates part off (or removing the addon after
 /fcui disable Nameplates) puts your old nameplate settings back.
 Minimap: "Minimap size" in the options scales the whole minimap cluster; the

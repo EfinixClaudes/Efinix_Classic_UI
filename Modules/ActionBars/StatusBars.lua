@@ -181,7 +181,7 @@ local function decorate(container)
     if decorated[container] then
         return decorated[container]
     end
-    local art = { xp = {}, rep = {} }
+    local art = { xp = {}, rep = {}, container = container }
     decorated[container] = art
 
     -- MainMenuExpBar BACKGROUND: black, alpha 0.5
@@ -210,15 +210,14 @@ local function decorate(container)
             ns.Dark.Tint(tex)
             art.xp[i] = tex
         end
-        if extra > 0 then
-            local filler = container:CreateTexture(nil, "OVERLAY")
-            filler:SetTexture(sheet)
-            filler:SetSize(extra, 10)
-            filler:SetPoint("BOTTOMLEFT", container, "BOTTOMLEFT", 768, 3)
-            filler:SetTexCoord(0, extra / 256, coords[3][1], coords[3][2])
-            ns.Dark.Tint(filler)
-            art.xp[#art.xp + 1] = filler
-        end
+        local filler = container:CreateTexture(nil, "OVERLAY")
+        filler:SetTexture(sheet)
+        filler:SetSize(math.max(extra, 0.01), 10)
+        filler:SetPoint("BOTTOMLEFT", container, "BOTTOMLEFT", 768, 3)
+        filler:SetTexCoord(0, math.max(extra, 0.01) / 256, coords[3][1], coords[3][2])
+        ns.Dark.Tint(filler)
+        art.xpFiller = filler
+        art.xpFillerCoords = coords[3]
     end
 
     -- ReputationWatchBarTexture0..3: UI-ReputationWatchBar 256x11 from TOPLEFT 0,2
@@ -246,17 +245,17 @@ local function decorate(container)
             previous = tex
         end
         local extra = AB.extraWidth or 0
-        if extra > 0 then
-            local filler = container:CreateTexture(nil, "OVERLAY")
-            filler:SetTexture(repSheet)
-            filler:SetSize(extra, 11)
-            filler:SetPoint("LEFT", art.rep[3], "RIGHT")
-            filler:SetTexCoord(0, extra / 256, coords[3][1], coords[3][2])
-            ns.Dark.Tint(filler)
-            art.rep[4]:ClearAllPoints()
-            art.rep[4]:SetPoint("LEFT", filler, "RIGHT")
-            art.rep[#art.rep + 1] = filler
-        end
+        local filler = container:CreateTexture(nil, "OVERLAY")
+        filler:SetTexture(repSheet)
+        filler:SetSize(math.max(extra, 0.01), 11)
+        filler:SetPoint("LEFT", art.rep[3], "RIGHT")
+        filler:SetTexCoord(0, math.max(extra, 0.01) / 256, coords[3][1], coords[3][2])
+        ns.Dark.Tint(filler)
+        art.rep[4]:ClearAllPoints()
+        art.rep[4]:SetPoint("LEFT", filler, "RIGHT")
+        art.rep[#art.rep + 1] = filler
+        art.repFiller = filler
+        art.repFillerCoords = coords[3]
     end
 
     hideBlizzardContainerArt(container)
@@ -269,8 +268,12 @@ local function decorate(container)
 end
 
 local function setArtMode(art, mode)
+    local xpShown = mode == "xp" or (mode == "rep" and #art.rep == 0)
     for _, tex in ipairs(art.xp) do
-        tex:SetShown(mode == "xp" or (mode == "rep" and #art.rep == 0))
+        tex:SetShown(xpShown)
+    end
+    if art.xpFiller then
+        art.xpFiller:SetShown(xpShown and (AB.extraWidth or 0) > 0)
     end
     for _, tex in ipairs(art.rep) do
         tex:SetShown(mode == "rep")
@@ -311,18 +314,47 @@ local function createMaxLevelArt()
         previous = t
     end
     local extra = AB.extraWidth or 0
-    if extra > 0 then
-        local filler = frame:CreateTexture(nil, "BACKGROUND")
-        filler:SetTexture(tex)
-        filler:SetSize(extra, 7)
-        filler:SetPoint("LEFT", pieces[3], "RIGHT")
-        filler:SetTexCoord(0, extra / 256, coords[3][1], coords[3][2])
-        ns.Dark.Tint(filler)
-        pieces[4]:ClearAllPoints()
-        pieces[4]:SetPoint("LEFT", filler, "RIGHT")
-    end
+    local filler = frame:CreateTexture(nil, "BACKGROUND")
+    filler:SetTexture(tex)
+    filler:SetSize(math.max(extra, 0.01), 7)
+    filler:SetPoint("LEFT", pieces[3], "RIGHT")
+    filler:SetTexCoord(0, math.max(extra, 0.01) / 256, coords[3][1], coords[3][2])
+    ns.Dark.Tint(filler)
+    pieces[4]:ClearAllPoints()
+    pieces[4]:SetPoint("LEFT", filler, "RIGHT")
+    StatusBars.maxLevelFiller = filler
+    StatusBars.maxLevelFillerCoords = coords[3]
     frame:Hide()
     StatusBars.maxLevelArt = frame
+end
+
+-- The trims follow the bar's length (AB.SetExtraWidth)
+function StatusBars.ApplyWidth()
+    local extra = AB.extraWidth or 0
+    local width = math.max(extra, 0.01)
+    for _, art in pairs(decorated) do
+        if art.xp[4] and art.container then
+            art.xp[4]:ClearAllPoints()
+            art.xp[4]:SetPoint("BOTTOMLEFT", art.container, "BOTTOMLEFT", 768 + extra, 3)
+        end
+        if art.xpFiller then
+            art.xpFiller:SetWidth(width)
+            art.xpFiller:SetTexCoord(0, width / 256, art.xpFillerCoords[1], art.xpFillerCoords[2])
+            art.xpFiller:SetShown(art.xpFiller:IsShown() and extra > 0)
+        end
+        if art.repFiller then
+            art.repFiller:SetWidth(width)
+            art.repFiller:SetTexCoord(0, width / 256, art.repFillerCoords[1], art.repFillerCoords[2])
+        end
+    end
+    if StatusBars.maxLevelArt then
+        StatusBars.maxLevelArt:SetWidth(AB.BarWidth())
+    end
+    local maxFiller = StatusBars.maxLevelFiller
+    if maxFiller then
+        maxFiller:SetWidth(width)
+        maxFiller:SetTexCoord(0, width / 256, StatusBars.maxLevelFillerCoords[1], StatusBars.maxLevelFillerCoords[2])
+    end
 end
 
 ---------------------------------------------------------------------------

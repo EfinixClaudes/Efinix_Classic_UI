@@ -60,6 +60,7 @@ local MODERN = {
 -- i.e. it ends 96 px past the bar's right edge. The modern group starts just
 -- beyond its tail, bottom-aligned with the classic buttons.
 local MODERN_GROUP_OFFSET_X = 100
+local MICRO_STRIDE = 29 - 3 -- MainMenuBarMicroButtons.xml: 29 wide, each overlapping the previous by 3
 
 local reskinned = setmetatable({}, { __mode = "k" }) -- button -> entry
 MicroMenu.own = {}
@@ -507,6 +508,17 @@ function MicroMenu.Position()
     if MicroMenu.own.Socials == nil then
         return
     end
+    -- the bar's extra length follows the number of extra buttons the game shows
+    local count = 0
+    if ns.db.microMenuRow then
+        for _, entry in ipairs(MODERN) do
+            local button = MicroMenu.own[entry.key]
+            if button and Raw.IsShown(button) then
+                count = count + 1
+            end
+        end
+    end
+    AB.SetExtraWidth(count * MICRO_STRIDE)
     local scale = ns.db.scale or 1
     if MicroMenu.blizzardMenu then
         Raw.SetScale(MicroMenu.blizzardMenu, scale)

@@ -49,6 +49,9 @@ local function wantedCVars()
         { name = GLOBAL_SCALE_CVAR, value = ("%.2f"):format(Nameplates.Scale()) },
         { name = "nameplateMinScale", value = "1" },
         { name = "nameplateMaxScale", value = "1" },
+        -- enemy players' bars in their class colour (Blizzard_NamePlates.lua reads
+        -- this into NamePlateEnemyFrameOptions.useClassColors)
+        { name = "nameplateShowClassColor", value = "1" },
     }
 end
 

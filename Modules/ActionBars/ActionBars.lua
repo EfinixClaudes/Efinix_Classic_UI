@@ -19,8 +19,26 @@ AB.BAR_WIDTH = 1024 -- MainMenuBar.xml: MainMenuBar 1024x53
 -- row and the bag buttons keep their 1.12 spacing. Set at MainBar.Create.
 AB.MICRO_EXTRA = 8 * 26
 AB.extraWidth = 0
+AB.extraWidthChanged = false
 function AB.BarWidth()
     return AB.BAR_WIDTH + (AB.extraWidth or 0)
+end
+
+-- The extra length follows the number of Forever-only micro buttons the game
+-- actually shows (MicroMenu.Position reports it; a game rule can remove some).
+-- Art and trims re-lay out at once; the bars get one more Position pass.
+function AB.SetExtraWidth(extra)
+    if extra == AB.extraWidth then
+        return
+    end
+    AB.extraWidth = extra
+    if AB.MainBar and AB.MainBar.ApplyWidth then
+        AB.MainBar.ApplyWidth()
+    end
+    if AB.StatusBars and AB.StatusBars.ApplyWidth then
+        AB.StatusBars.ApplyWidth()
+    end
+    AB.extraWidthChanged = true
 end
 AB.BAR_HEIGHT = 53
 AB.BUTTON = 36 -- ActionButtonTemplate.xml: 36x36
@@ -209,16 +227,17 @@ function AB.Position()
     end
     AB.Buttons.Anchor(MultiBarBottomLeft, "BOTTOMLEFT", art, "BOTTOMLEFT", MAIN_BAR_X, yBottom)
 
-    -- MultiActionBars.xml: MultiBarBottomRight LEFT to MultiBarBottomLeft (500 wide) RIGHT 10,0.
-    -- Anchored to the art rather than to MultiBarBottomLeft, so Blizzard moving
-    -- that bar in combat cannot drag this one along.
-    local xBottomRight = MAIN_BAR_X + MULTIBAR_LENGTH + 10
+    -- MultiActionBars.xml: MultiBarBottomRight LEFT to MultiBarBottomLeft (500 wide) RIGHT 10,0,
+    -- which on the 1024 bar puts its right edge 6 px inside the bar's right edge. It is
+    -- anchored to that right edge (not to MultiBarBottomLeft, so Blizzard moving that bar
+    -- in combat cannot drag this one along): on the longer bar both rows still end together.
+    local xBottomRight = -(AB.BAR_WIDTH - MAIN_BAR_X - 2 * MULTIBAR_LENGTH - 10) - MULTIBAR_LENGTH
     if AB.CanAnchor(MultiBarBottomRight) then
         Raw.SetScale(MultiBarBottomRight, scale)
         Raw.ClearAllPoints(MultiBarBottomRight)
-        Raw.SetPoint(MultiBarBottomRight, "BOTTOMLEFT", art, "BOTTOMLEFT", xBottomRight, yBottom)
+        Raw.SetPoint(MultiBarBottomRight, "BOTTOMLEFT", art, "BOTTOMRIGHT", xBottomRight, yBottom)
     end
-    AB.Buttons.Anchor(MultiBarBottomRight, "BOTTOMLEFT", art, "BOTTOMLEFT", xBottomRight, yBottom)
+    AB.Buttons.Anchor(MultiBarBottomRight, "BOTTOMLEFT", art, "BOTTOMRIGHT", xBottomRight, yBottom)
 
     -- MultiActionBars.xml: MultiBarRight (38x500, buttons from TOPRIGHT) at BOTTOMRIGHT -7,98,
     -- so the first button's top edge sits at 598 from the screen bottom.
@@ -295,6 +314,12 @@ function AB.Position()
     end
 
     positioning = false
+    if AB.extraWidthChanged then
+        -- the bar just changed length: one more pass puts everything on the new edges
+        AB.extraWidthChanged = false
+        AB.Position()
+        return
+    end
     if anchorDeferred then
         Combat.Queue("actionbars:position", AB.Position)
     end

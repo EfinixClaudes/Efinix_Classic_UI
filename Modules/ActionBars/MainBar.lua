@@ -50,15 +50,15 @@ function MainBar.Create()
             ns.Dark.Tint(tex)
             art.Textures[i] = tex
         end
-        if extra > 0 then
-            local filler = art:CreateTexture(nil, "ARTWORK")
-            filler:SetTexture(sheet)
-            filler:SetSize(extra, 43)
-            filler:SetPoint("BOTTOMLEFT", art, "BOTTOMLEFT", 768, 0)
-            filler:SetTexCoord(0, extra / 256, coords[3][1], coords[3][2])
-            ns.Dark.Tint(filler)
-            art.Filler = filler
-        end
+        local filler = art:CreateTexture(nil, "ARTWORK")
+        filler:SetTexture(sheet)
+        filler:SetSize(math.max(extra, 1), 43)
+        filler:SetPoint("BOTTOMLEFT", art, "BOTTOMLEFT", 768, 0)
+        filler:SetTexCoord(0, math.max(extra, 1) / 256, coords[3][1], coords[3][2])
+        filler:SetShown(extra > 0)
+        ns.Dark.Tint(filler)
+        art.Filler = filler
+        art.FillerCoords = coords[3]
     end
 
     -- MainMenuBar.xml MainMenuBarLeftEndCap / RightEndCap: 128x128 at BOTTOM -544 / 544,
@@ -82,6 +82,30 @@ function MainBar.Create()
     end
 
     MainBar.CreateLatencyBar(art)
+end
+
+-- The bar's length follows the micro menu row (AB.SetExtraWidth): the bag
+-- segment slides, the filler stretches. The art carries protected buttons,
+-- so its own size only changes out of combat.
+function MainBar.ApplyWidth()
+    local art = AB.frame
+    if not art then
+        return
+    end
+    local extra = AB.extraWidth or 0
+    if art.Textures and art.Textures[4] then
+        art.Textures[4]:ClearAllPoints()
+        art.Textures[4]:SetPoint("BOTTOMLEFT", art, "BOTTOMLEFT", 768 + extra, 0)
+    end
+    if art.Filler then
+        local width = math.max(extra, 1)
+        art.Filler:SetWidth(width)
+        art.Filler:SetTexCoord(0, width / 256, art.FillerCoords[1], art.FillerCoords[2])
+        art.Filler:SetShown(extra > 0)
+    end
+    ns.Combat.Run("mainbar:width", function()
+        Raw.SetSize(art, AB.BAR_WIDTH + extra, AB.BAR_HEIGHT)
+    end)
 end
 
 ---------------------------------------------------------------------------
