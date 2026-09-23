@@ -211,6 +211,7 @@ local function gridIndex(value, sorted)
     return math.floor((value - sorted[1]) / step + 0.5) + 1
 end
 
+local placeUngrouped -- defined below Rebuild's helpers, used by Rebuild
 local function sortedUnique(values)
     local seen, list = {}, {}
     for _, value in ipairs(values) do
@@ -221,6 +222,75 @@ local function sortedUnique(values)
     end
     table.sort(list)
     return list
+end
+
+-- Nodes without a group id go to the tree whose known nodes span their X
+-- position, or the nearest tree by X; if no node carries a group id at all,
+-- the tree's X values are cut into as many bands as there are trees at the
+-- widest gaps (Camelot draws the trees side by side).
+placeUngrouped = function(ungrouped)
+    if #ungrouped == 0 or #trees == 0 then
+        return
+    end
+    local anyGrouped = false
+    local ranges = {}
+    for index, tree in ipairs(trees) do
+        local minX, maxX
+        for _, node in ipairs(tree.nodes) do
+            anyGrouped = true
+            minX = math.min(minX or node.info.posX, node.info.posX)
+            maxX = math.max(maxX or node.info.posX, node.info.posX)
+        end
+        ranges[index] = { minX = minX, maxX = maxX }
+    end
+    if anyGrouped then
+        for _, node in ipairs(ungrouped) do
+            local best, bestDistance
+            for index, range in ipairs(ranges) do
+                if range.minX then
+                    local distance = 0
+                    if node.info.posX < range.minX then
+                        distance = range.minX - node.info.posX
+                    elseif node.info.posX > range.maxX then
+                        distance = node.info.posX - range.maxX
+                    end
+                    if not best or distance < bestDistance then
+                        best, bestDistance = index, distance
+                    end
+                end
+            end
+            local tree = trees[best or 1]
+            tree.nodes[#tree.nodes + 1] = node
+        end
+        return
+    end
+    local xs = {}
+    for _, node in ipairs(ungrouped) do
+        xs[#xs + 1] = node.info.posX
+    end
+    xs = sortedUnique(xs)
+    local gaps = {}
+    for i = 2, #xs do
+        gaps[#gaps + 1] = { at = xs[i - 1], size = xs[i] - xs[i - 1] }
+    end
+    table.sort(gaps, function(a, b)
+        return a.size > b.size
+    end)
+    local cuts = {}
+    for i = 1, math.min(#trees - 1, #gaps) do
+        cuts[#cuts + 1] = gaps[i].at
+    end
+    table.sort(cuts)
+    for _, node in ipairs(ungrouped) do
+        local index = 1
+        for _, cut in ipairs(cuts) do
+            if node.info.posX > cut then
+                index = index + 1
+            end
+        end
+        local tree = trees[math.min(index, #trees)]
+        tree.nodes[#tree.nodes + 1] = node
+    end
 end
 
 function Talents.Rebuild()
@@ -255,31 +325,48 @@ function Talents.Rebuild()
         pointsLeft = tonumber(plain(treeCurrency[1].quantity)) or 0
     end
 
-    -- nodes, grouped
+    -- nodes: matched to a tree by any of their group ids; nodes without a
+    -- matching group are placed by X position (see placeUngrouped)
     local byNode = {}
+    local ungrouped = {}
+    Talents.skipped = { invisible = 0, subTree = 0, selection = 0, total = 0 }
     for _, nodeID in ipairs(C_Traits.GetTreeNodes(treeID) or {}) do
         local nodeInfo = C_Traits.GetNodeInfo(configID, nodeID)
-        if nodeInfo and nodeInfo.isVisible and not nodeInfo.subTreeID then
-            local tree = byGroup[nodeInfo.groupIDs and nodeInfo.groupIDs[1]]
+        Talents.skipped.total = Talents.skipped.total + 1
+        if not nodeInfo or not nodeInfo.isVisible then
+            Talents.skipped.invisible = Talents.skipped.invisible + 1
+        elseif nodeInfo.subTreeID then
+            Talents.skipped.subTree = Talents.skipped.subTree + 1
+        elseif Enum.TraitNodeType and nodeInfo.type == Enum.TraitNodeType.SubTreeSelection then
+            Talents.skipped.selection = Talents.skipped.selection + 1
+        else
+            local tree
+            for _, groupID in ipairs(nodeInfo.groupIDs or {}) do
+                tree = tree or byGroup[groupID]
+            end
+            local entryID, entry, definition = nodeDefinition(nodeInfo)
+            local node = {
+                nodeID = nodeID,
+                info = nodeInfo,
+                entryID = entryID,
+                entry = entry,
+                definition = definition,
+                name = talentName(definition),
+                icon = talentIcon(definition),
+                rank = tonumber(plain(nodeInfo.ranksPurchased)) or 0,
+                maxRank = tonumber(plain(nodeInfo.maxRanks)) or 1,
+                prereqs = {},
+            }
+            byNode[nodeID] = node
             if tree then
-                local entryID, entry, definition = nodeDefinition(nodeInfo)
-                local node = {
-                    nodeID = nodeID,
-                    info = nodeInfo,
-                    entryID = entryID,
-                    entry = entry,
-                    definition = definition,
-                    name = talentName(definition),
-                    icon = talentIcon(definition),
-                    rank = tonumber(plain(nodeInfo.ranksPurchased)) or 0,
-                    maxRank = tonumber(plain(nodeInfo.maxRanks)) or 1,
-                    prereqs = {},
-                }
                 tree.nodes[#tree.nodes + 1] = node
-                byNode[nodeID] = node
+            else
+                ungrouped[#ungrouped + 1] = node
             end
         end
     end
+    Talents.skipped.ungrouped = #ungrouped
+    placeUngrouped(ungrouped)
     -- prerequisites: an edge runs from the required talent to the one that needs it
     for _, node in pairs(byNode) do
         for _, edge in ipairs(node.info.visibleEdges or {}) do
@@ -1246,7 +1333,53 @@ function Talents:Diag()
     if treeID then
         local nodes = C_Traits.GetTreeNodes(treeID) or {}
         local groups = C_Traits.GetGroupDisplayInfoByTreeID(treeID) or {}
-        ns.Print("  tree nodes=%d groups=%d", #nodes, #groups)
+        local skipped = Talents.skipped or {}
+        ns.Print(
+            "  tree nodes=%d groups=%d invisible=%s subtree=%s selection=%s ungrouped=%s",
+            #nodes,
+            #groups,
+            tostring(skipped.invisible),
+            tostring(skipped.subTree),
+            tostring(skipped.selection),
+            tostring(skipped.ungrouped)
+        )
+        for i, info in ipairs(groups) do
+            ns.Print(
+                "  group %d id=%s order=%s name=%s",
+                i,
+                tostring(info.groupID),
+                tostring(info.orderIndex),
+                tostring(info.displayName)
+            )
+        end
+        for i = 1, math.min(#nodes, 12) do
+            local info = C_Traits.GetNodeInfo(configID, nodes[i])
+            if info then
+                local groupText = {}
+                for _, id in ipairs(info.groupIDs or {}) do
+                    groupText[#groupText + 1] = tostring(id)
+                end
+                ns.Print(
+                    "  node %s vis=%s type=%s pos=%s,%s groups=%s ranks=%s/%s sub=%s",
+                    tostring(nodes[i]),
+                    tostring(info.isVisible),
+                    tostring(info.type),
+                    tostring(info.posX),
+                    tostring(info.posY),
+                    table.concat(groupText, "+"),
+                    tostring(info.ranksPurchased),
+                    tostring(info.maxRanks),
+                    tostring(info.subTreeID)
+                )
+            end
+        end
+        local raw = backgroundBase()
+        ns.Print(
+            "  painting %s media=%s client=%s",
+            raw,
+            tostring(ns.Assets.HasMedia(raw)),
+            tostring(ns.Compat.TextureExists(raw .. "-TopLeft"))
+        )
     end
     for index, tree in ipairs(trees) do
         local columns, tiers = 0, 0
