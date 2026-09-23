@@ -244,6 +244,8 @@ local function canvas()
     return WorldMapFrame and WorldMapFrame.ScrollContainer and WorldMapFrame.ScrollContainer.Child
 end
 
+local attachToMap -- defined below, used by RefreshMap
+
 local function getPin(index)
     local pin = pins[index]
     if pin then
@@ -293,8 +295,20 @@ local function placePin(pin, node)
     pin:SetPoint("CENTER", child, "TOPLEFT", (child:GetWidth() * node.x) / scale, -(child:GetHeight() * node.y) / scale)
 end
 
+Gather.lastRefresh = "never"
 function Gather.RefreshMap()
+    if not overlay then
+        attachToMap()
+    end
     if not overlay or not WorldMapFrame or not WorldMapFrame:IsShown() then
+        Gather.lastRefresh = "skipped (map hidden or no overlay)"
+        return
+    end
+    local child = canvas()
+    if not child or (child:GetWidth() or 0) < 1 then
+        -- the canvas has no size yet (first show): once more after this frame
+        C_Timer.After(0, Gather.RefreshMap)
+        Gather.lastRefresh = "deferred (canvas not sized)"
         return
     end
     load()
@@ -320,6 +334,13 @@ function Gather.RefreshMap()
     for index = used + 1, #pins do
         pins[index]:Hide()
     end
+    Gather.lastRefresh = ("%d pins on map %s (canvas %.0fx%.0f, scale %.2f)"):format(
+        used,
+        tostring(mapID),
+        child:GetWidth(),
+        child:GetHeight(),
+        1 / pinScale()
+    )
 end
 
 local function rescale()
@@ -356,7 +377,7 @@ local function createCheck(key, label, x)
     return check
 end
 
-local function attachToMap()
+attachToMap = function()
     if overlay or not canvas() then
         return
     end
@@ -460,7 +481,7 @@ function Gather:Diag()
         end
     end
     ns.Print(
-        "  mining=%d herbs=%d (here: %d / %d, map %s) overlay=%s pending=%s",
+        "  mining=%d herbs=%d (here: %d / %d, player map %s) overlay=%s pending=%s",
         #nodes.m,
         #nodes.h,
         here.m,
@@ -468,5 +489,24 @@ function Gather:Diag()
         tostring(mapID),
         tostring(overlay ~= nil),
         tostring(pending and pending.name)
+    )
+    local maps = {}
+    for _, list in pairs(nodes) do
+        for _, node in ipairs(list) do
+            maps[node.map] = (maps[node.map] or 0) + 1
+        end
+    end
+    local parts = {}
+    for id, count in pairs(maps) do
+        parts[#parts + 1] = tostring(id) .. ":" .. count
+    end
+    ns.Print(
+        "  maps with spots: %s; window map=%s shown=%s; checks mining=%s herbs=%s; last refresh: %s",
+        table.concat(parts, " "),
+        tostring(WorldMapFrame and WorldMapFrame:GetMapID()),
+        tostring(WorldMapFrame and WorldMapFrame:IsShown()),
+        tostring(settings().showMining),
+        tostring(settings().showHerbs),
+        Gather.lastRefresh
     )
 end
