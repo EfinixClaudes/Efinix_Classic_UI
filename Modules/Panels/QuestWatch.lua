@@ -301,8 +301,12 @@ function QW:Init()
 end
 
 function QW:Enable()
+    -- hidden, but its events stay: ObjectiveTrackerFrameMixin:OnEvent is what
+    -- adds an accepted quest to the watch list (autoQuestWatch) and re-sorts
+    -- the watches on zone changes
     if ObjectiveTrackerFrame then
-        ns.Hide(ObjectiveTrackerFrame)
+        local keepEvents = true
+        ns.Hide(ObjectiveTrackerFrame, keepEvents)
     end
     for _, event in ipairs({
         "QUEST_WATCH_LIST_CHANGED",
