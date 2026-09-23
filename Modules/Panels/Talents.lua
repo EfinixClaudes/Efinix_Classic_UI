@@ -197,21 +197,24 @@ end
 -- Node positions are tree coordinates (units of 1/10 px in Blizzard's own
 -- layout); within one group the distinct X values are the columns and the
 -- distinct Y values the tiers. A node may sit a few units off its column,
--- so sorted values are clustered: a gap smaller than 40% of the widest gap
--- belongs to the same column or tier.
+-- so sorted values are clustered: a gap smaller than 40% of the typical
+-- (median) gap belongs to the same column or tier. The median, not the
+-- widest gap, so one node far off to the side cannot fold the others together.
 local function clusters(sorted)
     local list = {}
     if #sorted == 0 then
         return list
     end
-    local widest = 0
+    local gaps = {}
     for i = 2, #sorted do
-        widest = math.max(widest, sorted[i] - sorted[i - 1])
+        gaps[#gaps + 1] = sorted[i] - sorted[i - 1]
     end
+    table.sort(gaps)
+    local typical = gaps[math.ceil(#gaps / 2)] or 0
     local current = { min = sorted[1], max = sorted[1] }
     list[1] = current
     for i = 2, #sorted do
-        if sorted[i] - sorted[i - 1] > widest * 0.4 then
+        if sorted[i] - sorted[i - 1] > typical * 0.4 then
             current = { min = sorted[i], max = sorted[i] }
             list[#list + 1] = current
         else
