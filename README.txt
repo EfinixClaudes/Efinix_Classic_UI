@@ -130,7 +130,10 @@ only out of combat) is not supported; 2006 had no such thing.
 BAGS
 ----
 
-Press B or click the backpack as usual, everything opens in one window.
+Press B or click the backpack as usual, everything opens in one window drawn
+from the 2006 bag art: the ring with the backpack at the top left, the leather
+title bar, one carved cell per slot and the bag's bottom edge. The bank window
+uses the old bank bag art.
 Click a bag icon at the top of the window to hide or show that bag's slots.
 Drag a bag icon off to unequip that bag, or drop a bag onto an icon to equip it
 there (or swap it with the bag already in that slot). Hovering an icon shows the

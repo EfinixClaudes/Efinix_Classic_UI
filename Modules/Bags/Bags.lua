@@ -316,6 +316,147 @@ local function isBagHidden(kind, bagID)
 end
 
 ---------------------------------------------------------------------------
+-- 1.12 bag chrome (ContainerFrame.xml / ContainerFrame_GenerateFrame):
+-- UI-Bag-Components is a 256x512 sheet whose right 190 px hold the bag.
+-- Measured on the sheet: title band rows 2-50 (portrait ring, leather bar,
+-- close box; ring at texels 66-122, close box from 218), a cell row band at
+-- rows 213-254 that repeats per row, cells 41.5 texels wide from texel 76
+-- (four on the sheet, repeated across our columns), a 3 px left border
+-- (texels 73-76) and a 12 px right border (242-254), the 10 px bottom edge
+-- at rows 169-179, and the leather between bar and first row (rows 30-48)
+-- for the bag-icon strip and the footer. The bank uses the "-Bank" sheet.
+---------------------------------------------------------------------------
+local ART = "Interface\\ContainerFrame\\UI-Bag-Components"
+local ART_BANK = "Interface\\ContainerFrame\\UI-Bag-Components-Bank"
+local SHEET_W, SHEET_H = 256, 512
+local EDGE_LEFT, EDGE_RIGHT = 3, 12
+local TOP_BAND = 48
+local STRIP = 30 -- bag icons above the cells, search/sort/money below
+local BOTTOM = 10
+local CELL = SLOT + SPACING -- 41: one baked cell per item button
+local CELL_TEXELS = 41.5
+local CELL_U0 = 76
+local CELL_INSET = 3 -- the 37 px button inside its 41 px cell
+local ROW_V0, ROW_V1 = 213, 254
+local TOP_V0, TOP_V1 = 2, 50
+local LEATHER_V0, LEATHER_V1 = 30, 48
+local BOTTOM_V0, BOTTOM_V1 = 169, 179
+
+local function artAvailable(file)
+    return ns.Assets.HasMedia(file) or ns.Compat.TextureExists(file) == true
+end
+
+local function coords(texture, x0, x1, y0, y1)
+    texture:SetTexCoord(x0 / SHEET_W, x1 / SHEET_W, y0 / SHEET_H, y1 / SHEET_H)
+end
+
+local function chromeTexture(window)
+    local texture = window:CreateTexture(nil, "BACKGROUND")
+    texture:SetTexture(window.artFile)
+    ns.Dark.Tint(texture)
+    return texture
+end
+
+-- left border, stretched leather, right border: the bag-icon strip and the footer
+local function createStrip(window)
+    local strip = { left = chromeTexture(window), fill = chromeTexture(window), right = chromeTexture(window) }
+    coords(strip.left, 73, 76, ROW_V0, ROW_V1)
+    coords(strip.fill, 122, 218, LEATHER_V0, LEATHER_V1)
+    coords(strip.right, 242, 254, ROW_V0, ROW_V1)
+    return strip
+end
+
+local function placeStrip(strip, window, y, height, width)
+    strip.left:SetSize(EDGE_LEFT, height)
+    strip.left:SetPoint("TOPLEFT", window, "TOPLEFT", 0, y)
+    strip.fill:SetSize(width - EDGE_LEFT - EDGE_RIGHT, height)
+    strip.fill:SetPoint("TOPLEFT", window, "TOPLEFT", EDGE_LEFT, y)
+    strip.right:SetSize(EDGE_RIGHT, height)
+    strip.right:SetPoint("TOPRIGHT", window, "TOPRIGHT", 0, y)
+end
+
+local function createChrome(window)
+    local chrome = { rows = {} }
+    window.chrome = chrome
+    chrome.topLeft = chromeTexture(window)
+    coords(chrome.topLeft, 66, 122, TOP_V0, TOP_V1)
+    chrome.topLeft:SetSize(56, TOP_BAND)
+    chrome.topLeft:SetPoint("TOPLEFT", window, "TOPLEFT", -7, 0) -- the ring overhangs the border as in 1.12
+    chrome.topFill = chromeTexture(window)
+    coords(chrome.topFill, 122, 218, TOP_V0, TOP_V1)
+    chrome.topFill:SetPoint("TOPLEFT", chrome.topLeft, "TOPRIGHT", 0, 0)
+    chrome.topRight = chromeTexture(window)
+    coords(chrome.topRight, 218, 254, TOP_V0, TOP_V1)
+    chrome.topRight:SetSize(36, TOP_BAND)
+    chrome.topRight:SetPoint("TOPRIGHT", window, "TOPRIGHT", 0, 0)
+    chrome.topFill:SetPoint("BOTTOMRIGHT", chrome.topRight, "BOTTOMLEFT", 0, 0)
+    chrome.toggleStrip = createStrip(window)
+    chrome.footer = createStrip(window)
+    chrome.bottomLeft = chromeTexture(window)
+    coords(chrome.bottomLeft, 73, 90, BOTTOM_V0, BOTTOM_V1)
+    chrome.bottomLeft:SetSize(17, BOTTOM)
+    chrome.bottomLeft:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", 0, 0)
+    chrome.bottomRight = chromeTexture(window)
+    coords(chrome.bottomRight, 236, 254, BOTTOM_V0, BOTTOM_V1)
+    chrome.bottomRight:SetSize(18, BOTTOM)
+    chrome.bottomRight:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", 0, 0)
+    chrome.bottomFill = chromeTexture(window)
+    coords(chrome.bottomFill, 90, 236, BOTTOM_V0, BOTTOM_V1)
+    chrome.bottomFill:SetPoint("TOPLEFT", chrome.bottomLeft, "TOPRIGHT", 0, 0)
+    chrome.bottomFill:SetPoint("BOTTOMRIGHT", chrome.bottomRight, "BOTTOMLEFT", 0, 0)
+end
+
+-- one baked cell per column and row, borders left and right of every row
+local function layoutChrome(window, columns, rows)
+    local chrome = window.chrome
+    local width = EDGE_LEFT + columns * CELL + EDGE_RIGHT
+    local y = -TOP_BAND
+    placeStrip(chrome.toggleStrip, window, y, STRIP, width)
+    y = y - STRIP
+    for row = 1, rows do
+        local pieces = chrome.rows[row]
+        if not pieces then
+            pieces = { left = chromeTexture(window), right = chromeTexture(window), cells = {} }
+            coords(pieces.left, 73, 76, ROW_V0, ROW_V1)
+            coords(pieces.right, 242, 254, ROW_V0, ROW_V1)
+            chrome.rows[row] = pieces
+        end
+        pieces.left:SetSize(EDGE_LEFT, CELL)
+        pieces.left:SetPoint("TOPLEFT", window, "TOPLEFT", 0, y)
+        pieces.left:Show()
+        pieces.right:SetSize(EDGE_RIGHT, CELL)
+        pieces.right:SetPoint("TOPRIGHT", window, "TOPRIGHT", 0, y)
+        pieces.right:Show()
+        for column = 1, columns do
+            local cell = pieces.cells[column]
+            if not cell then
+                cell = chromeTexture(window)
+                local slot = (column - 1) % 4
+                coords(cell, CELL_U0 + slot * CELL_TEXELS, CELL_U0 + (slot + 1) * CELL_TEXELS, ROW_V0, ROW_V1)
+                pieces.cells[column] = cell
+            end
+            cell:SetSize(CELL, CELL)
+            cell:SetPoint("TOPLEFT", window, "TOPLEFT", EDGE_LEFT + (column - 1) * CELL, y)
+            cell:Show()
+        end
+        for column = columns + 1, #pieces.cells do
+            pieces.cells[column]:Hide()
+        end
+        y = y - CELL
+    end
+    for row = rows + 1, #chrome.rows do
+        local pieces = chrome.rows[row]
+        pieces.left:Hide()
+        pieces.right:Hide()
+        for _, cell in ipairs(pieces.cells) do
+            cell:Hide()
+        end
+    end
+    placeStrip(chrome.footer, window, y, STRIP, width)
+    return width, TOP_BAND + STRIP + rows * CELL + STRIP + BOTTOM
+end
+
+---------------------------------------------------------------------------
 -- Classic widgets
 ---------------------------------------------------------------------------
 local BACKDROP = {
@@ -682,7 +823,8 @@ local function getToggle(window, index)
 end
 
 local function layoutToggles(window, bagIDs)
-    local x = PADDING
+    local x = window.chrome and 8 or PADDING
+    local y = window.chrome and -(TOP_BAND + 3) or -30
     for index, bagID in ipairs(bagIDs) do
         local toggle = getToggle(window, index)
         toggle.bagID = bagID
@@ -691,7 +833,7 @@ local function layoutToggles(window, bagIDs)
         toggle.Icon:SetDesaturated(hidden)
         toggle.Icon:SetAlpha(hidden and 0.4 or 1)
         toggle:ClearAllPoints()
-        toggle:SetPoint("TOPLEFT", window, "TOPLEFT", x, -30)
+        toggle:SetPoint("TOPLEFT", window, "TOPLEFT", x, y)
         toggle:Show()
         x = x + TOGGLE + 4
     end
@@ -777,8 +919,13 @@ function Bags.RefreshWindow(kind, relayout)
     end
 
     local rows = math.max(1, math.ceil(index / columns))
-    local width = PADDING * 2 + columns * stride - SPACING
-    local height = HEADER + rows * stride - SPACING + FOOTER + PADDING
+    local width, height
+    if window.chrome then
+        width, height = layoutChrome(window, columns, rows)
+    else
+        width = PADDING * 2 + columns * stride - SPACING
+        height = HEADER + rows * stride - SPACING + FOOTER + PADDING
+    end
     window:SetSize(width, height)
     window.Items:SetSize(columns * stride - SPACING, rows * stride - SPACING)
     if index == 0 then
@@ -898,9 +1045,20 @@ local function createWindow(kind, title)
     window:EnableMouse(true)
     window:SetClampedToScreen(true)
     window:RegisterForDrag("LeftButton")
-    window:SetBackdrop(BACKDROP)
-    window:SetBackdropColor(0.05, 0.05, 0.05, 0.92)
-    ns.Dark.Backdrop(window, 1, 1, 1)
+    window.artFile = kind == "bank" and ART_BANK or ART
+    if not artAvailable(window.artFile) and artAvailable(ART) then
+        window.artFile = ART
+    end
+    if artAvailable(window.artFile) then
+        window.artFile = ns.Assets.Resolve(window.artFile)
+        createChrome(window)
+    else
+        -- the 1.12 sheet is not on this machine: tooltip-style backdrop
+        window.artFile = nil
+        window:SetBackdrop(BACKDROP)
+        window:SetBackdropColor(0.05, 0.05, 0.05, 0.92)
+        ns.Dark.Backdrop(window, 1, 1, 1)
+    end
     window:SetScript("OnDragStart", function(self)
         self:StartMoving()
     end)
@@ -926,8 +1084,24 @@ local function createWindow(kind, title)
     end)
     window:Hide()
 
-    window.Title = window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    window.Title:SetPoint("TOP", window, "TOP", 0, -12)
+    if window.chrome then
+        -- ContainerFrame.xml: portrait 40x40 at 7,-5 (from the sheet's left, 9 px left of our border),
+        -- name in GameFontHighlight at 47,-10 inside the leather bar
+        window.Portrait = window:CreateTexture(nil, "BORDER")
+        window.Portrait:SetSize(40, 40)
+        window.Portrait:SetPoint("TOPLEFT", window, "TOPLEFT", -2, -5)
+        window.Portrait:SetTexture(
+            kind == "bank" and "Interface\\Icons\\INV_Misc_Coin_02"
+                or (Assets.Get("Bags.Backpack") or "Interface\\Buttons\\Button-Backpack-Up")
+        )
+        window.Portrait:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        window.Title = window:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        window.Title:SetPoint("TOPLEFT", window, "TOPLEFT", 40, -10)
+        window.Title:SetJustifyH("LEFT")
+    else
+        window.Title = window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        window.Title:SetPoint("TOP", window, "TOP", 0, -12)
+    end
     window.Title:SetText(title)
 
     window.Close = createCloseButton(window, function()
@@ -935,7 +1109,11 @@ local function createWindow(kind, title)
     end)
 
     window.Items = CreateFrame("Frame", nil, window)
-    window.Items:SetPoint("TOPLEFT", window, "TOPLEFT", PADDING, -HEADER)
+    if window.chrome then
+        window.Items:SetPoint("TOPLEFT", window, "TOPLEFT", EDGE_LEFT + CELL_INSET, -(TOP_BAND + STRIP + CELL_INSET))
+    else
+        window.Items:SetPoint("TOPLEFT", window, "TOPLEFT", PADDING, -HEADER)
+    end
     window.Items:SetSize(1, 1)
 
     window.Empty = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -947,7 +1125,11 @@ local function createWindow(kind, title)
     window.Search = CreateFrame("EditBox", "FCUI_Bags_" .. kind .. "_Search", window, "InputBoxTemplate")
     window.Search:SetSize(110, 20)
     window.Search:SetAutoFocus(false)
-    window.Search:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", PADDING + 6, PADDING)
+    if window.chrome then
+        window.Search:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", EDGE_LEFT + 6, BOTTOM + 4)
+    else
+        window.Search:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", PADDING + 6, PADDING)
+    end
     window.Search:SetScript("OnTextChanged", function(self)
         if C_Container.SetItemSearch then
             C_Container.SetItemSearch(self:GetText())
@@ -1001,7 +1183,11 @@ local function createWindow(kind, title)
 
     -- Money
     window.Money = CreateFrame("Frame", "FCUI_Bags_" .. kind .. "_Money", window, "SmallMoneyFrameTemplate")
-    window.Money:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -6, PADDING)
+    if window.chrome then
+        window.Money:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -EDGE_RIGHT - 2, BOTTOM + 4)
+    else
+        window.Money:SetPoint("BOTTOMRIGHT", window, "BOTTOMRIGHT", -6, PADDING)
+    end
 
     if kind == "bank" then
         window.BlizzardBank = createPanelButton(window, "Blizzard bank", 96)
