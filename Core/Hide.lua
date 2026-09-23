@@ -14,34 +14,53 @@ holder:Hide()
 ns.hiddenHolder = holder
 
 local hidden = {} -- frame -> true
+local parked = {} -- frame -> true for ns.Hide (reparented), absent for ns.Suppress
 ns.hiddenFrames = hidden
+
+-- Only a protected frame has to wait for the end of combat; anything else
+-- (the objective tracker, panels) can be put away at once, even in a fight.
+local function canAct(frame)
+    if not InCombatLockdown() then
+        return true
+    end
+    return not (frame.IsProtected and frame:IsProtected())
+end
+
+-- Blizzard's managed-frame containers re-parent their frames on every
+-- layout pass; a parked frame goes back into the holder when that happens.
+local function putAway(frame)
+    if parked[frame] and frame:GetParent() ~= holder then
+        Raw.SetParent(frame, holder)
+    end
+    Raw.Hide(frame)
+end
 
 function ns.Hide(frame, keepEvents)
     if not frame or hidden[frame] then
         return
     end
     hidden[frame] = true
+    parked[frame] = true
 
     local function apply()
         if not keepEvents and frame.UnregisterAllEvents then
             frame:UnregisterAllEvents()
         end
-        Raw.SetParent(frame, holder)
-        Raw.Hide(frame)
+        putAway(frame)
     end
 
     ns.Combat.Run("hide:" .. tostring(frame:GetName() or frame), apply)
 
     hooksecurefunc(frame, "Show", function(self)
-        if hidden[self] and not InCombatLockdown() then
-            Raw.Hide(self)
+        if hidden[self] and canAct(self) then
+            putAway(self)
         end
     end)
     -- SetShown(true) bypasses the Show hook; OnShow catches it.
     if frame.HookScript then
         frame:HookScript("OnShow", function(self)
-            if hidden[self] and not InCombatLockdown() then
-                Raw.Hide(self)
+            if hidden[self] and canAct(self) then
+                putAway(self)
             end
         end)
     end
@@ -63,13 +82,13 @@ function ns.Suppress(frame)
         Raw.Hide(frame)
     end)
     hooksecurefunc(frame, "Show", function(self)
-        if hidden[self] and not InCombatLockdown() then
+        if hidden[self] and canAct(self) then
             Raw.Hide(self)
         end
     end)
     if frame.HookScript then
         frame:HookScript("OnShow", function(self)
-            if hidden[self] and not InCombatLockdown() then
+            if hidden[self] and canAct(self) then
                 Raw.Hide(self)
             end
         end)
@@ -80,8 +99,8 @@ end
 -- guards above may not act then) is put away again when the fight ends.
 ns.RegisterEvent("PLAYER_REGEN_ENABLED", hidden, function()
     for frame in pairs(hidden) do
-        if Raw.IsShown(frame) then
-            Raw.Hide(frame)
+        if Raw.IsShown(frame) or (parked[frame] and frame:GetParent() ~= holder) then
+            putAway(frame)
         end
     end
 end)
