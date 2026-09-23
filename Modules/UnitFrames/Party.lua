@@ -11,6 +11,11 @@ local UF = ns.UnitFrames
 local Party = {}
 UF.Party = Party
 
+-- Own module, so the party frames can be turned off on their own while the
+-- player, target and pet frames stay classic (and the other way round).
+local PartyFrames = ns.RegisterModule("PartyFrames", {})
+ns.PartyFrames = PartyFrames
+
 local T = "Interface\\TargetingFrame\\"
 local FILES = {
     party = T .. "UI-PartyFrame",
@@ -279,11 +284,39 @@ end
 
 function Party.Enable()
     if not PartyFrame then
-        ns.Log("UnitFrames", "PartyFrame missing, party frames left untouched")
+        ns.Log("PartyFrames", "PartyFrame missing, party frames left untouched")
         return
     end
     Party.SetupAll()
     if type(PartyFrame.InitializePartyMemberFrames) == "function" then
         hooksecurefunc(PartyFrame, "InitializePartyMemberFrames", Party.SetupAll)
     end
+end
+
+function PartyFrames:Init() end
+
+function PartyFrames:Enable()
+    Party.Enable()
+    -- the 1.12 spot for the party frame is part of the UnitFrames move system
+    if UF.ApplyPosition then
+        UF.ApplyPosition("PartyFrame")
+    end
+end
+
+function PartyFrames:Disable()
+    ns.Print("PartyFrames disabled, /reload to restore the Blizzard party frames")
+end
+
+function PartyFrames:Refresh()
+    Party.SetupAll()
+end
+
+function PartyFrames:Diag()
+    local count = 0
+    if PartyFrame and PartyFrame.PartyMemberFramePool then
+        for _ in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+            count = count + 1
+        end
+    end
+    ns.Print("  PartyFrame=%s member frames=%d", tostring(PartyFrame ~= nil), count)
 end

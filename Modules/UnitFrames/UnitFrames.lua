@@ -25,8 +25,13 @@ local MOVABLE = {
         label = "Pet",
         default = { point = "TOPLEFT", relativeTo = "PlayerFrame", relativePoint = "TOPLEFT", x = 80, y = -60 },
     },
-    { name = "PartyFrame", label = "Party", default = { point = "TOPLEFT", x = 10, y = -128 } },
+    { name = "PartyFrame", label = "Party", default = { point = "TOPLEFT", x = 10, y = -128 }, module = "PartyFrames" },
 }
+
+-- an entry that belongs to another module is left alone while that module is off
+local function entryEnabled(entry)
+    return not entry.module or ns.db.modules[entry.module] ~= false
+end
 
 UF.movers = {}
 UF.moveMode = false
@@ -64,6 +69,9 @@ function UF.ApplyPosition(name)
     end
     local pos = savedPosition(name)
     local entry = entryFor(name)
+    if entry and not entryEnabled(entry) then
+        return
+    end
     Combat.Run("ufpos:" .. name, function()
         if pos then
             local scale = frame:GetScale()
@@ -186,9 +194,11 @@ end
 function UF:Init()
     ns.db.positions = ns.db.positions or {}
     for _, entry in ipairs(MOVABLE) do
-        local mover = createMover(entry)
-        if mover then
-            UF.movers[entry.name] = mover
+        if entryEnabled(entry) then
+            local mover = createMover(entry)
+            if mover then
+                UF.movers[entry.name] = mover
+            end
         end
     end
 end
@@ -224,9 +234,6 @@ function UF:Enable()
     end)
     if UF.Skin then
         UF.Skin.Enable()
-    end
-    if UF.Party then
-        UF.Party.Enable()
     end
     UF.ApplyAll()
 end

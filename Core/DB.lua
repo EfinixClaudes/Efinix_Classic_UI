@@ -12,6 +12,7 @@ local DEFAULTS = {
     modules = {
         ActionBars = true,
         UnitFrames = true,
+        PartyFrames = true,
         CastBar = true,
         SwingTimer = true,
         Minimap = true,

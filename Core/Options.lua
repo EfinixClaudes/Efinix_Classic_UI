@@ -12,7 +12,8 @@ ns.Options = Options
 -- order and player-facing names
 local MODULES = {
     { key = "ActionBars", label = "Action bars, micro menu, bag buttons, XP bar" },
-    { key = "UnitFrames", label = "Player, target, pet and party frames" },
+    { key = "UnitFrames", label = "Player, target and pet frames" },
+    { key = "PartyFrames", label = "Party frames" },
     { key = "CastBar", label = "Cast bar" },
     { key = "SwingTimer", label = "Weapon swing timer" },
     { key = "Minimap", label = "Minimap" },

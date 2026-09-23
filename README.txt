@@ -55,8 +55,8 @@ COMMANDS  (type them in the chat box)
                             Also a checkbox in the options window.
 /fcui disable Bags          turns a part off. Parts: ActionBars, UnitFrames, CastBar,
                             SwingTimer, Minimap, Auras, Chat, Tooltip, Nameplates,
-                            RaidFrames, LootFrame, SpellBook, Talents, QuestWatch,
-                            Bags, Vendor.
+                            PartyFrames, RaidFrames, LootFrame, SpellBook, Talents,
+                            QuestWatch, Bags, Vendor.
 /fcui enable Bags           turns it on again. Both need /reload afterwards.
 /fcui reset                 forgets all settings, then /reload
 
