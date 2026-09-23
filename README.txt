@@ -45,6 +45,9 @@ COMMANDS  (type them in the chat box)
 /fcui bags selljunk         sells all grey items (only at a vendor)
 /fcui bags bank             opens the bank window anywhere, showing what was in your
                             bank the last time you visited one
+/fcui gather                how many mining and herb spots the addon has recorded;
+                            "/fcui gather clear" (or "clear mining", "clear herbs")
+                            forgets them
 /fcui bags shiftsell off    turns the hold-Shift auto sell and repair off (on = back on)
 /fcui scale 1.1             makes the whole bottom bar bigger or smaller (0.5-2.0)
 /fcui dark on               dark mode: all frame art (bars, unit frames, minimap,
@@ -56,7 +59,7 @@ COMMANDS  (type them in the chat box)
 /fcui disable Bags          turns a part off. Parts: ActionBars, UnitFrames, CastBar,
                             SwingTimer, Minimap, Auras, Chat, Tooltip, Nameplates,
                             PartyFrames, RaidFrames, LootFrame, SpellBook, Talents,
-                            QuestWatch, Bags, Vendor.
+                            QuestWatch, Bags, Vendor, Gather.
 /fcui enable Bags           turns it on again. Both need /reload afterwards.
 /fcui reset                 forgets all settings, then /reload
 
@@ -109,6 +112,12 @@ talent learns it at once. If the game cannot apply it right away (in combat,
 while casting) the point stays placed and an Apply button appears; right-click
 takes such an unapplied point back. Dual talent specs are not shown yet; the
 game's own window still has them (turn the Talents part off for that).
+Gathering: every ore vein and herb you gather is remembered with its spot, and
+the M map shows them as small pick and leaf pins. Two checkboxes at the bottom
+left of the map, "Mining" and "Herbs", show or hide them. Nobody has recorded
+Forever's node spawns yet, so the map fills in as you play; after a few laps of
+a zone the route through its nodes is on the map. Hover a pin for the node's
+name and how often you gathered it there.
 Quest watch: the tracked quests are a plain text list under the minimap as in
 2006, yellow titles with their objectives below, finished objectives greyed.
 They are grouped under their quest-log zone headers, and each zone folds with

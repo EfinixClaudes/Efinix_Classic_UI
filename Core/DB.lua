@@ -25,6 +25,7 @@ local DEFAULTS = {
         SpellBook = true,
         Talents = true,
         QuestWatch = true,
+        Gather = true,
         Bags = true,
         Vendor = true,
     },
@@ -36,6 +37,8 @@ local DEFAULTS = {
     swingTimer = { previous = nil },
     -- UnitFrames: player-chosen frame positions, name -> {point, x, y} on UIParent
     positions = {},
+    -- Gather: which recorded node kinds the world map shows
+    gather = { showMining = true, showHerbs = true },
     -- QuestWatch: folded zone headers, zone name -> true
     questWatch = { collapsed = {} },
     bags = {

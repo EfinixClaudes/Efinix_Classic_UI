@@ -54,3 +54,4 @@ Modules\Panels\QuestWatch.lua
 Modules\Bags\Bags.lua
 Modules\Bags\Blizzard.lua
 Modules\Bags\Junk.lua
+Modules\Gather\Gather.lua
