@@ -279,6 +279,38 @@ local function getPin(index)
     return pin
 end
 
+-- A spot recorded on one map drawn on another (its continent, a sub-map,
+-- or simply a different id for the same zone): through world coordinates.
+-- Returns nil when the spot lies outside the map being viewed.
+local translated = {} -- node -> mapID -> { x, y } | false
+local function positionOn(node, mapID)
+    if node.map == mapID then
+        return node.x, node.y
+    end
+    translated[node] = translated[node] or {}
+    local cached = translated[node][mapID]
+    if cached == nil then
+        cached = false
+        if C_Map.GetWorldPosFromMapPos and C_Map.GetMapPosFromWorldPos and CreateVector2D then
+            local ok, continentID, world = pcall(C_Map.GetWorldPosFromMapPos, node.map, CreateVector2D(node.x, node.y))
+            if ok and continentID and world then
+                local ok2, targetMap, position = pcall(C_Map.GetMapPosFromWorldPos, continentID, world, mapID)
+                if ok2 and targetMap == mapID and position then
+                    local x, y = position:GetXY()
+                    if x and y and x > 0 and x < 1 and y > 0 and y < 1 then
+                        cached = { x = x, y = y }
+                    end
+                end
+            end
+        end
+        translated[node][mapID] = cached
+    end
+    if cached then
+        return cached.x, cached.y
+    end
+    return nil
+end
+
 local function pinScale()
     local scale = WorldMapFrame and WorldMapFrame.GetCanvasScale and WorldMapFrame:GetCanvasScale() or 1
     if not scale or scale <= 0 then
@@ -287,12 +319,13 @@ local function pinScale()
     return 1 / scale
 end
 
-local function placePin(pin, node)
+local function placePin(pin, x, y)
     local child = canvas()
     local scale = pinScale()
+    pin.mapX, pin.mapY = x, y
     pin:SetScale(scale)
     pin:ClearAllPoints()
-    pin:SetPoint("CENTER", child, "TOPLEFT", (child:GetWidth() * node.x) / scale, -(child:GetHeight() * node.y) / scale)
+    pin:SetPoint("CENTER", child, "TOPLEFT", (child:GetWidth() * x) / scale, -(child:GetHeight() * y) / scale)
 end
 
 Gather.lastRefresh = "never"
@@ -319,13 +352,14 @@ function Gather.RefreshMap()
         local wanted = (profession == "m" and shown.showMining) or (profession == "h" and shown.showHerbs)
         if wanted then
             for _, node in ipairs(nodes[profession]) do
-                if node.map == mapID then
+                local x, y = positionOn(node, mapID)
+                if x then
                     used = used + 1
                     local pin = getPin(used)
                     pin.node = node
                     pin.profession = profession
                     pin.Icon:SetTexture(ICONS[profession])
-                    placePin(pin, node)
+                    placePin(pin, x, y)
                     pin:Show()
                 end
             end
@@ -345,8 +379,8 @@ end
 
 local function rescale()
     for _, pin in ipairs(pins) do
-        if pin:IsShown() and pin.node then
-            placePin(pin, pin.node)
+        if pin:IsShown() and pin.node and pin.mapX then
+            placePin(pin, pin.mapX, pin.mapY)
         end
     end
 end
