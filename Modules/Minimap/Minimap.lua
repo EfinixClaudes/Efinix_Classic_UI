@@ -335,10 +335,12 @@ local function layoutIndicator()
         return
     end
     -- Minimap.xml 1.12: MiniMapMailFrame is a child of the round map, its TOPRIGHT
-    -- 21 px right of and 38 px below the map's TOPRIGHT (over the ring). The layout
-    -- frame wraps the mail frame exactly, so its TOPRIGHT is the mail frame's.
+    -- 21 px right of and 38 px below the map's TOPRIGHT (over the ring). The cluster
+    -- sits at the screen edge here, so the same spot mirrored to the left ring,
+    -- under the tracking icon, keeps the letter on screen. The layout frame wraps
+    -- the mail frame exactly, so its corner is the mail frame's.
     Raw.ClearAllPoints(indicator)
-    Raw.SetPoint(indicator, "TOPRIGHT", Minimap, "TOPRIGHT", 21, -38)
+    Raw.SetPoint(indicator, "TOPLEFT", Minimap, "TOPLEFT", -21, -38)
     if indicator.CraftingOrderFrame then
         ns.Suppress(indicator.CraftingOrderFrame)
     end
