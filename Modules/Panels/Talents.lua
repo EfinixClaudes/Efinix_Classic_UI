@@ -120,19 +120,42 @@ local branchArray = {} -- [tier][column] = { id, up, down, left, right, leftArro
 ---------------------------------------------------------------------------
 -- Data (C_Traits / C_ClassTalents)
 ---------------------------------------------------------------------------
+-- Camelot resolves the talent configuration through the active spec group
+-- (ClassTalentsFrameMixin:SetTab -> GetCombatConfigIDForSpecGroup); the
+-- Retail GetActiveConfigID and the combat config list are the fallbacks.
+Talents.configSource = "none"
 local function activeConfig()
-    if not C_ClassTalents or not C_ClassTalents.GetActiveConfigID then
-        return nil
+    local candidates = {}
+    if C_SpecializationInfo and C_SpecializationInfo.GetCombatConfigIDForSpecGroup then
+        local group = C_SpecializationInfo.GetActiveSpecGroup and C_SpecializationInfo.GetActiveSpecGroup() or 1
+        local ok, id = pcall(C_SpecializationInfo.GetCombatConfigIDForSpecGroup, group)
+        if ok and id then
+            candidates[#candidates + 1] = { id = id, source = "specgroup" }
+        end
     end
-    local id = C_ClassTalents.GetActiveConfigID()
-    if not id then
-        return nil
+    if C_ClassTalents and C_ClassTalents.GetActiveConfigID then
+        local id = C_ClassTalents.GetActiveConfigID()
+        if id then
+            candidates[#candidates + 1] = { id = id, source = "active" }
+        end
     end
-    local info = C_Traits.GetConfigInfo(id)
-    if not info or not info.treeIDs or not info.treeIDs[1] then
-        return nil
+    if C_Traits.GetConfigsByType and Enum.TraitConfigType and Enum.TraitConfigType.Combat then
+        local ok, ids = pcall(C_Traits.GetConfigsByType, Enum.TraitConfigType.Combat)
+        if ok and type(ids) == "table" then
+            for _, id in ipairs(ids) do
+                candidates[#candidates + 1] = { id = id, source = "combatlist" }
+            end
+        end
     end
-    return id, info.treeIDs[1]
+    for _, candidate in ipairs(candidates) do
+        local info = C_Traits.GetConfigInfo(candidate.id)
+        if info and info.treeIDs and info.treeIDs[1] then
+            Talents.configSource = candidate.source
+            return candidate.id, info.treeIDs[1]
+        end
+    end
+    Talents.configSource = "none (" .. #candidates .. " candidates)"
+    return nil
 end
 
 local function nodeDefinition(nodeInfo)
@@ -995,7 +1018,8 @@ function Talents.Update()
 
     local tree = trees[selectedTab]
     local raw = backgroundBase()
-    if ns.Assets.HasMedia(raw .. "-TopLeft") or ns.Compat.TextureExists(raw .. "-TopLeft") then
+    -- the import manifest lists the base name; the client is asked for the first piece
+    if ns.Assets.HasMedia(raw) or ns.Compat.TextureExists(raw .. "-TopLeft") then
         local base = ns.Assets.Resolve(raw)
         frame.Background.topLeft:SetTexture(base .. "-TopLeft")
         frame.Background.topRight:SetTexture(base .. "-TopRight")
@@ -1192,16 +1216,22 @@ end
 function Talents:Diag()
     Talents.Refresh()
     ns.Print(
-        "  window=%s shown=%s config=%s tree=%s trees=%d points=%d tab=%d staged=%s",
+        "  window=%s shown=%s config=%s (%s) tree=%s trees=%d points=%d tab=%d staged=%s",
         tostring(frame ~= nil),
         tostring(frame and frame:IsShown()),
         tostring(configID),
+        Talents.configSource,
         tostring(treeID),
         #trees,
         pointsLeft,
         selectedTab,
         tostring(hasStagedChanges())
     )
+    if treeID then
+        local nodes = C_Traits.GetTreeNodes(treeID) or {}
+        local groups = C_Traits.GetGroupDisplayInfoByTreeID(treeID) or {}
+        ns.Print("  tree nodes=%d groups=%d", #nodes, #groups)
+    end
     for index, tree in ipairs(trees) do
         local columns, tiers = 0, 0
         for _, node in ipairs(tree.nodes) do
