@@ -223,7 +223,7 @@ local function sortedUnique(values)
     return list
 end
 
-function Talents.Refresh()
+function Talents.Rebuild()
     trees = {}
     pointsLeft = 0
     configID, treeID = activeConfig()
@@ -976,7 +976,7 @@ local function createFrame()
 
     frame:SetScript("OnShow", function()
         sound(SOUNDKIT and (SOUNDKIT.TALENT_SCREEN_OPEN or SOUNDKIT.IG_CHARACTER_INFO_OPEN))
-        Talents.Refresh()
+        Talents.Rebuild()
         Talents.Update()
         if ns.ActionBars and ns.ActionBars.MicroMenu and ns.ActionBars.MicroMenu.UpdateOwnStates then
             ns.ActionBars.MicroMenu.UpdateOwnStates()
@@ -1154,7 +1154,7 @@ function Talents:Enable()
     ns.RegisterEvent("UPDATE_BINDINGS", self, updateBindings)
     local function refresh()
         if frame and frame:IsShown() then
-            Talents.Refresh()
+            Talents.Rebuild()
             Talents.Update()
         end
     end
@@ -1196,7 +1196,13 @@ function Talents:Disable()
     ns.Print("Talents disabled, /reload to restore the Blizzard talent window")
 end
 
-function Talents:Refresh() end
+-- module lifecycle (the data loader is Talents.Rebuild)
+function Talents:Refresh()
+    if frame and frame:IsShown() then
+        Talents.Rebuild()
+        Talents.Update()
+    end
+end
 
 function Talents.Toggle()
     if not frame then
@@ -1214,7 +1220,7 @@ function Talents.IsShown()
 end
 
 function Talents:Diag()
-    Talents.Refresh()
+    Talents.Rebuild()
     ns.Print(
         "  window=%s shown=%s config=%s (%s) tree=%s trees=%d points=%d tab=%d staged=%s",
         tostring(frame ~= nil),
