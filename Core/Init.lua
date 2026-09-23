@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-23.49" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-23.50" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -438,6 +438,34 @@ SlashCmdList.FCUI = function(input)
             ns.Print("dark mode %s", rest)
         else
             ns.Print("usage: /fcui dark on|off (currently %s)", ns.Dark.Enabled() and "on" or "off")
+        end
+    elseif cmd == "under" then
+        -- every visible frame under the mouse, deepest first: for finding stray art
+        local found = {}
+        local frame = EnumerateFrames()
+        while frame do
+            if frame.IsVisible and frame:IsVisible() and frame.IsMouseOver and frame:IsMouseOver() then
+                found[#found + 1] = frame
+            end
+            frame = EnumerateFrames(frame)
+        end
+        table.sort(found, function(a, b)
+            return a:GetFrameLevel() > b:GetFrameLevel()
+        end)
+        ns.Print("%d visible frames under the mouse:", #found)
+        for i = 1, math.min(#found, 25) do
+            local f = found[i]
+            local parent = f:GetParent()
+            ns.Print(
+                "  %s (%s) %.0fx%.0f scale %.2f level %d parent %s",
+                tostring(f:GetName() or f:GetDebugName()),
+                f:GetObjectType(),
+                f:GetWidth(),
+                f:GetHeight(),
+                f:GetEffectiveScale(),
+                f:GetFrameLevel(),
+                tostring(parent and (parent:GetName() or parent:GetDebugName()))
+            )
         end
     elseif cmd == "reset" then
         ns.DB.Reset()

@@ -75,3 +75,13 @@ function ns.Suppress(frame)
         end)
     end
 end
+
+-- A hidden or suppressed frame that Blizzard showed during combat (the
+-- guards above may not act then) is put away again when the fight ends.
+ns.RegisterEvent("PLAYER_REGEN_ENABLED", hidden, function()
+    for frame in pairs(hidden) do
+        if Raw.IsShown(frame) then
+            Raw.Hide(frame)
+        end
+    end
+end)
