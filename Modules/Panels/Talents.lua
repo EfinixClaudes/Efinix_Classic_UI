@@ -994,11 +994,19 @@ function Talents.Update()
     end
 
     local tree = trees[selectedTab]
-    local base = ns.Assets.Resolve(backgroundBase())
-    frame.Background.topLeft:SetTexture(base .. "-TopLeft")
-    frame.Background.topRight:SetTexture(base .. "-TopRight")
-    frame.Background.bottomLeft:SetTexture(base .. "-BottomLeft")
-    frame.Background.bottomRight:SetTexture(base .. "-BottomRight")
+    local raw = backgroundBase()
+    if ns.Assets.HasMedia(raw .. "-TopLeft") or ns.Compat.TextureExists(raw .. "-TopLeft") then
+        local base = ns.Assets.Resolve(raw)
+        frame.Background.topLeft:SetTexture(base .. "-TopLeft")
+        frame.Background.topRight:SetTexture(base .. "-TopRight")
+        frame.Background.bottomLeft:SetTexture(base .. "-BottomLeft")
+        frame.Background.bottomRight:SetTexture(base .. "-BottomRight")
+    else
+        -- painting not on this machine yet (see tools/import_blizzard_art.py): plain dark board
+        for _, texture in pairs(frame.Background) do
+            texture:SetColorTexture(0.05, 0.05, 0.05, 0.8)
+        end
+    end
 
     frame.PointsText:SetText(pointsLeft)
     if tree then
