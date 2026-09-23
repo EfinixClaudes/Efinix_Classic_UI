@@ -101,6 +101,32 @@ local function applyModernTextures(button)
     end
 end
 
+-- Alert pulse (MicroButtonPulse -> UIFrameFlash on FlashBorder/FlashContent:
+-- shows both at their native atlas size and animates their alpha, so alpha 0
+-- does not hold). 1.12 had no pulsing micro buttons; the two textures lose
+-- their art and are kept hidden.
+local flashHooked = setmetatable({}, { __mode = "k" })
+
+local function neutraliseFlash(button)
+    for _, key in ipairs({ "FlashBorder", "FlashContent" }) do
+        local tex = button[key]
+        if tex then
+            tex:SetTexture(nil)
+            tex:SetAlpha(0)
+            tex:Hide()
+            if not flashHooked[tex] then
+                flashHooked[tex] = true
+                hooksecurefunc(tex, "Show", function(self)
+                    self:Hide()
+                end)
+                hooksecurefunc(tex, "SetAtlas", function(self)
+                    self:SetTexture(nil)
+                end)
+            end
+        end
+    end
+end
+
 -- Classic frame around a modern-only menu: character button frame, the
 -- menu's Vanilla icon where the portrait would be (18x25 at TOP 0,-28).
 local modernIcons = setmetatable({}, { __mode = "k" }) -- button -> our icon texture
@@ -131,9 +157,8 @@ local function applyClassicModernTextures(button, entry)
     local disabled = button:GetDisabledTexture()
     disabled:SetAllPoints(button)
     disabled:SetDesaturated(true)
-    -- the modern backdrop, shadow and alert-flash pieces
-    local pieces = { "Background", "PushedBackground", "Shadow", "PushedShadow", "FlashBorder", "FlashContent" }
-    for _, key in ipairs(pieces) do
+    -- the modern backdrop and shadow pieces
+    for _, key in ipairs({ "Background", "PushedBackground", "Shadow", "PushedShadow" }) do
         if button[key] then
             button[key]:SetAlpha(0)
         end
@@ -248,6 +273,7 @@ local function reskin(button, entry)
             button[key]:SetAlpha(0)
         end
     end
+    neutraliseFlash(button)
     if button.PortraitMask and button.Portrait and button.Portrait.RemoveMaskTexture then
         pcall(button.Portrait.RemoveMaskTexture, button.Portrait, button.PortraitMask)
     end
