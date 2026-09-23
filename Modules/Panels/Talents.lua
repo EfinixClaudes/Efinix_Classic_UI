@@ -1034,8 +1034,18 @@ function Talents.Update()
 
     frame.PointsText:SetText(pointsLeft)
     if tree then
+        -- 1.12: "Points spent in %s Talents:" plus the number; Forever's string is
+        -- "%1$s Talents: %2$s" and takes the number itself
         local spentFormat = MASTERY_POINTS_SPENT or "Points spent in %s Talents:"
-        frame.SpentPoints:SetText(spentFormat:format(tree.name or "") .. " |cffffffff" .. tree.spent .. "|r")
+        local count = "|cffffffff" .. tree.spent .. "|r"
+        local ok, text = pcall(string.format, spentFormat, tree.name or "", count)
+        if not ok then
+            ok, text = pcall(string.format, spentFormat, tree.name or "")
+            text = ok and (text .. " " .. count) or ((tree.name or "") .. ": " .. count)
+        elseif not spentFormat:find("%%2") and not spentFormat:find("%%s.*%%s") then
+            text = text .. " " .. count
+        end
+        frame.SpentPoints:SetText(text)
     else
         frame.SpentPoints:SetText("")
     end
