@@ -7,10 +7,13 @@ local _, ns = ...
 -- Forever has no Socials or World Map micro button, so those two are ours.
 -- Buttons for systems Vanilla did not have (professions book, legacy,
 -- housing, guild/communities, group finder, collections, adventure guide,
--- shop) stay visible. They wear the 1.12 character button frame (the one
+-- shop) are our own buttons: the 1.12 character button frame (the one
 -- empty micro button frame Vanilla shipped: UI-MicroButtonCharacter-Up, with
--- the portrait window left dark) and a Vanilla-era icon in that window. By
--- default they continue the micro menu row and the bar art grows to fit
+-- the portrait window left dark) with a Vanilla-era icon in that window. A
+-- click is forwarded to Blizzard's button, which is suppressed, so the
+-- game's own toggle, kiosk and keybind-mode checks run and none of its art
+-- (atlases at native size, alert pulses, notification overlays) can show.
+-- By default they continue the micro menu row and the bar art grows to fit
 -- (ActionBars.MICRO_EXTRA); with that option off they form a second group
 -- to the right of the right gryphon, since the 1024 bar has no free pixels
 -- between the micro menu and the bag buttons.
@@ -37,14 +40,20 @@ local CLASSIC = {
 -- in every client since 1.x); the modern atlas art stays as the fallback.
 local ICONS = "Interface\\Icons\\"
 local MODERN = {
-    { frame = "ProfessionMicroButton", modern = true, icon = ICONS .. "Trade_BlackSmithing" },
-    { frame = "GuildMicroButton", modern = true, icon = ICONS .. "INV_Shield_04" },
-    { frame = "LFDMicroButton", modern = true, icon = ICONS .. "INV_Misc_GroupLooking" },
-    { frame = "LegacyMicroButton", modern = true, icon = ICONS .. "INV_Misc_Book_11" },
-    { frame = "CollectionsMicroButton", modern = true, icon = ICONS .. "Ability_Mount_RidingHorse" },
-    { frame = "EJMicroButton", modern = true, icon = ICONS .. "INV_Misc_Bone_HumanSkull_01" },
-    { frame = "HousingMicroButton", modern = true, icon = ICONS .. "INV_Misc_Rune_01" }, -- the hearthstone: home
-    { frame = "StoreMicroButton", modern = true, icon = ICONS .. "INV_Misc_Coin_02" },
+    { key = "Profession", frame = "ProfessionMicroButton", modern = true, icon = ICONS .. "Trade_BlackSmithing" },
+    { key = "Guild", frame = "GuildMicroButton", modern = true, icon = ICONS .. "INV_Shield_04" },
+    { key = "LFD", frame = "LFDMicroButton", modern = true, icon = ICONS .. "INV_Misc_GroupLooking" },
+    { key = "Legacy", frame = "LegacyMicroButton", modern = true, icon = ICONS .. "INV_Misc_Book_11" },
+    {
+        key = "Collections",
+        frame = "CollectionsMicroButton",
+        modern = true,
+        icon = ICONS .. "Ability_Mount_RidingHorse",
+    },
+    { key = "EJ", frame = "EJMicroButton", modern = true, icon = ICONS .. "INV_Misc_Bone_HumanSkull_01" },
+    -- housing: the hearthstone, home
+    { key = "Housing", frame = "HousingMicroButton", modern = true, icon = ICONS .. "INV_Misc_Rune_01" },
+    { key = "Store", frame = "StoreMicroButton", modern = true, icon = ICONS .. "INV_Misc_Coin_02" },
 }
 
 -- MainMenuBar.xml: right gryphon spans 544-64 .. 544+64 from the bar centre,
@@ -410,9 +419,81 @@ local function createOwnButtons()
     end
 end
 
+-- Forever-only menus: our own classic buttons in front of Blizzard's
+local function createModernButtons()
+    for _, entry in ipairs(MODERN) do
+        local blizzard = _G[entry.frame]
+        if blizzard and not MicroMenu.own[entry.key] then
+            -- a game rule can keep a menu out of Blizzard's micro menu; then ours stays hidden too
+            entry.inMenu = blizzard:GetParent() == _G.MicroMenu
+            local label = entry.frame:gsub("MicroButton$", "")
+            local button = createOwnButton(entry.key, label, nil, function(_, mouseButton)
+                if blizzard:IsEnabled() then
+                    blizzard:Click(mouseButton)
+                end
+            end, function()
+                return blizzard:GetButtonState() == "PUSHED"
+            end)
+            button.blizzard = blizzard
+            button:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText(blizzard.tooltipText or label, 1, 1, 1)
+                if not blizzard:IsEnabled() then
+                    local why = blizzard.disabledTooltip
+                    if type(why) == "function" then
+                        why = why()
+                    end
+                    if type(why) == "string" then
+                        GameTooltip:AddLine(why, 1, 0.1, 0.1, true)
+                    end
+                end
+                GameTooltip:Show()
+            end)
+            applyClassicModernTextures(button, entry)
+            if not modernIcons[button] then
+                -- no classic frame or icon file: the modern art, scaled to the classic footprint
+                local pairs_ = {
+                    { "GetNormalTexture", "SetNormalAtlas" },
+                    { "GetPushedTexture", "SetPushedAtlas" },
+                    { "GetDisabledTexture", "SetDisabledAtlas" },
+                    { "GetHighlightTexture", "SetHighlightAtlas" },
+                }
+                for _, pair in ipairs(pairs_) do
+                    local source = blizzard[pair[1]](blizzard)
+                    local atlas = source and source:GetAtlas()
+                    if atlas then
+                        button[pair[2]](button, atlas)
+                        fitModernRegion(button, button[pair[1]](button))
+                    end
+                end
+            end
+            -- Blizzard's button keeps its events and state (UpdateMicroButtons drives it), just never shows
+            ns.Suppress(blizzard)
+            for _, method in ipairs({ "SetPushed", "SetNormal", "Enable", "Disable" }) do
+                AB.Hook(blizzard, method, function()
+                    MicroMenu.UpdateOwnStates()
+                end)
+            end
+            if not entry.inMenu then
+                button:Hide()
+            end
+        end
+    end
+end
+
 local function updateOwnStates()
     for _, button in pairs(MicroMenu.own) do
         button:UpdateState()
+        local blizzard = button.blizzard
+        if blizzard then
+            local enabled = blizzard:IsEnabled()
+            button:SetEnabled(enabled)
+            local icon = modernIcons[button]
+            if icon then
+                icon:SetDesaturated(not enabled)
+                icon:SetAlpha(button:GetButtonState() == "PUSHED" and 0.5 or 1)
+            end
+        end
     end
 end
 MicroMenu.UpdateOwnStates = updateOwnStates
@@ -453,7 +534,7 @@ function MicroMenu.Position()
         previous = nil
     end
     for _, entry in ipairs(MODERN) do
-        local button = _G[entry.frame]
+        local button = MicroMenu.own[entry.key]
         if button and Raw.IsShown(button) then
             Raw.ClearAllPoints(button)
             if previous then
@@ -515,14 +596,7 @@ function MicroMenu.Enable()
         ns.RegisterEvent("PLAYER_ENTERING_WORLD", MicroMenu, suppressTicketButton)
     end
 
-    for _, entry in ipairs(MODERN) do
-        local button = _G[entry.frame]
-        if button then
-            reskin(button, entry)
-            AB.HookScript(button, "OnShow", MicroMenu.Position)
-            AB.HookScript(button, "OnHide", MicroMenu.Position)
-        end
-    end
+    createModernButtons()
 
     -- Blizzard's latency strip lives on the main menu button; ours is on the art frame
     if MainMenuMicroButton and MainMenuMicroButton.MainMenuBarPerformanceBar then
