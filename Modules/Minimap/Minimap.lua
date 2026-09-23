@@ -316,12 +316,16 @@ local function styleMail()
         icon:SetSize(18, 18)
         icon:SetPoint("TOPLEFT", mail, "TOPLEFT", 7, -6)
     end
-    -- modern flipbook animations have no Vanilla counterpart
+    -- modern flipbook animations have no Vanilla counterpart; Blizzard hides the
+    -- icon while they play and shows it when they finish, we show it at once
     if mail.NewMailFlipbook then
         mail.NewMailFlipbook:Hide()
     end
     if mail.MailReminderFlipbook then
         mail.MailReminderFlipbook:Hide()
+    end
+    if icon and HasNewMail and HasNewMail() then
+        icon:Show()
     end
 end
 
@@ -330,9 +334,11 @@ local function layoutIndicator()
     if not indicator then
         return
     end
-    -- the layout frame's TOPLEFT is the mail frame's TOPLEFT
+    -- Minimap.xml 1.12: MiniMapMailFrame is a child of the round map, its TOPRIGHT
+    -- 21 px right of and 38 px below the map's TOPRIGHT (over the ring). The layout
+    -- frame wraps the mail frame exactly, so its TOPRIGHT is the mail frame's.
     Raw.ClearAllPoints(indicator)
-    Raw.SetPoint(indicator, "TOPLEFT", MinimapCluster, "TOPRIGHT", 21, -38)
+    Raw.SetPoint(indicator, "TOPRIGHT", Minimap, "TOPRIGHT", 21, -38)
     if indicator.CraftingOrderFrame then
         ns.Suppress(indicator.CraftingOrderFrame)
     end
