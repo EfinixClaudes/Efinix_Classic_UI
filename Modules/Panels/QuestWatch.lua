@@ -12,7 +12,8 @@ local _, ns = ...
 local QW = ns.RegisterModule("QuestWatch", {})
 ns.QuestWatch = QW
 
-local WIDTH = 230
+local WIDTH = 250
+local RIGHT_INSET = 100 -- clear of MultiBarRight and MultiBarLeft (38 + 5 + 38 px plus the 7 px edge gap)
 local LINE_GAP = 2
 local GROUP_GAP = 8
 local INDENT_QUEST = 18 -- text starts right of the 16 px plus/minus button
@@ -20,6 +21,18 @@ local INDENT_OBJECTIVE = 28
 local PLUS = "Interface\\Buttons\\UI-PlusButton-Up"
 local MINUS = "Interface\\Buttons\\UI-MinusButton-Up"
 local PLUS_HIGHLIGHT = "Interface\\Buttons\\UI-PlusButton-Hilight"
+
+-- one point larger than the 1.12 GameFontNormalSmall lines: zone 13, quest 12, objective 11
+local function sizedFont(name, base, size)
+    local font = CreateFont(name)
+    font:SetFontObject(base)
+    local path, _, flags = font:GetFont()
+    font:SetFont(path, size, flags)
+    return font
+end
+local FONT_ZONE = sizedFont("FCUI_QuestWatchZoneFont", GameFontNormal, 13)
+local FONT_QUEST = sizedFont("FCUI_QuestWatchQuestFont", GameFontNormal, 12)
+local FONT_OBJECTIVE = sizedFont("FCUI_QuestWatchObjectiveFont", GameFontNormal, 11)
 
 local frame
 local lines = {} -- pooled line buttons
@@ -212,7 +225,7 @@ function QW.Update()
         if collapsed[group.zone] then
             label = ("%s (%d)"):format(group.zone, #group.quests)
         end
-        y = placeLine(header, y, INDENT_QUEST, label, 1, 0.82, 0, GameFontNormal)
+        y = placeLine(header, y, INDENT_QUEST, label, 1, 0.82, 0, FONT_ZONE)
         if not collapsed[group.zone] then
             for _, quest in ipairs(group.quests) do
                 used = used + 1
@@ -225,7 +238,7 @@ function QW.Update()
                 if quest.complete and #quest.objectives == 0 then
                     text = text .. " (" .. (COMPLETE or "Complete") .. ")"
                 end
-                y = placeLine(title, y, INDENT_QUEST, text, 1, 0.82, 0, GameFontNormalSmall)
+                y = placeLine(title, y, INDENT_QUEST, text, 1, 0.82, 0, FONT_QUEST)
                 for _, objective in ipairs(quest.objectives) do
                     used = used + 1
                     local line = getLine(used)
@@ -234,18 +247,9 @@ function QW.Update()
                     line:EnableMouse(false)
                     line.Toggle:Hide()
                     if objective.finished then
-                        y = placeLine(
-                            line,
-                            y,
-                            INDENT_OBJECTIVE,
-                            "- " .. objective.text,
-                            0.6,
-                            0.6,
-                            0.6,
-                            GameFontNormalSmall
-                        )
+                        y = placeLine(line, y, INDENT_OBJECTIVE, "- " .. objective.text, 0.6, 0.6, 0.6, FONT_OBJECTIVE)
                     else
-                        y = placeLine(line, y, INDENT_OBJECTIVE, "- " .. objective.text, 1, 1, 1, GameFontNormalSmall)
+                        y = placeLine(line, y, INDENT_OBJECTIVE, "- " .. objective.text, 1, 1, 1, FONT_OBJECTIVE)
                     end
                 end
             end
@@ -275,11 +279,12 @@ end
 local function createFrame()
     frame = CreateFrame("Frame", "FCUI_QuestWatchFrame", UIParent)
     frame:SetSize(WIDTH, 1)
-    -- 1.12: hanging under the minimap on the right
+    -- 1.12: hanging under the minimap on the right; pulled in past the two
+    -- vertical action bars at the screen edge
     if MinimapCluster then
-        frame:SetPoint("TOPRIGHT", MinimapCluster, "BOTTOMRIGHT", -18, -12)
+        frame:SetPoint("TOPRIGHT", MinimapCluster, "BOTTOMRIGHT", -RIGHT_INSET, -12)
     else
-        frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -40, -240)
+        frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -RIGHT_INSET, -240)
     end
     frame:SetFrameStrata("BACKGROUND")
     frame:Hide()
