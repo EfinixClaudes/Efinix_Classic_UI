@@ -28,7 +28,8 @@ local CLASSIC = {
     { frame = "CharacterMicroButton", character = true },
     -- our own button when the SpellBook module runs, Blizzard's otherwise
     { own = "Spellbook", frame = "SpellbookMicroButton", asset = "Micro.Spellbook" },
-    { frame = "TalentMicroButton", asset = "Micro.Talents" },
+    -- our own button when the Talents module runs, Blizzard's otherwise
+    { own = "Talents", frame = "TalentMicroButton", asset = "Micro.Talents" },
     { frame = "QuestLogMicroButton", asset = "Micro.Quest" },
     { own = "Socials", asset = "Micro.Socials" },
     { own = "WorldMap", asset = "Micro.World" },
@@ -389,6 +390,17 @@ local function createOwnButtons()
         )
         reskin(button, { asset = "Micro.Spellbook" })
         if not Assets.Get("Micro.Spellbook") then
+            button:Hide()
+        end
+    end
+    if not MicroMenu.own.Talents and ns.db.modules.Talents and ns.Talents then
+        local button = createOwnButton("Talents", TALENTS or "Talents", "TOGGLETALENTS", function()
+            ns.Talents.Toggle()
+        end, function()
+            return ns.Talents.IsShown()
+        end)
+        reskin(button, { asset = "Micro.Talents" })
+        if not Assets.Get("Micro.Talents") then
             button:Hide()
         end
     end

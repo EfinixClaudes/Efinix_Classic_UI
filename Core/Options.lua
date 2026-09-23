@@ -23,6 +23,7 @@ local MODULES = {
     { key = "RaidFrames", label = "Hide the modern raid frames" },
     { key = "LootFrame", label = "Loot window" },
     { key = "SpellBook", label = "Spellbook" },
+    { key = "Talents", label = "Talent window" },
     { key = "Bags", label = "Bag window (all bags in one)" },
     { key = "Vendor", label = "Vendor: sell junk and repair while holding Shift" },
 }

@@ -55,7 +55,7 @@ COMMANDS  (type them in the chat box)
                             Also a checkbox in the options window.
 /fcui disable Bags          turns a part off. Parts: ActionBars, UnitFrames, CastBar,
                             SwingTimer, Minimap, Auras, Chat, Tooltip, Nameplates,
-                            RaidFrames, LootFrame, SpellBook, Bags, Vendor.
+                            RaidFrames, LootFrame, SpellBook, Talents, Bags, Vendor.
 /fcui enable Bags           turns it on again. Both need /reload afterwards.
 /fcui reset                 forgets all settings, then /reload
 
@@ -100,10 +100,18 @@ book with the skill tabs on the right. Drag spells to your bars as usual. It ope
 and closes in combat too, and Escape closes it. Clicking a spell in the book casts
 it, except during combat, where the game only lets you look, read tooltips and
 drag; casting from the book is back the moment the fight ends.
+Talents: N (or the talents button) opens the old 384 px talent window: your
+portrait, one tab per talent tree with the tree's painting behind it, the
+4-column grid with the green and gold rank badges, the branch lines and arrows
+between talents, "Points spent" and "Talent Points" as in 2006. Clicking a
+talent learns it at once. If the game cannot apply it right away (in combat,
+while casting) the point stays placed and an Apply button appears; right-click
+takes such an unapplied point back. Dual talent specs are not shown yet; the
+game's own window still has them (turn the Talents part off for that).
 Loot window: the small 2006 loot panel with four item slots and page arrows
 opens at the top left, or under the mouse if you have that option turned on.
-The options window (/fcui) lets you turn the spellbook and loot window off
-if you prefer the game's own versions.
+The options window (/fcui) lets you turn the spellbook, talent and loot windows
+off if you prefer the game's own versions.
 Edit Mode still works for things the addon does not manage. The addon puts the
 player, target, focus, pet, cast bar, swing timer, chat and tooltip frames in
 their 2006 places, but as soon as you drag one of them in Edit Mode and save,

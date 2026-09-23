@@ -22,6 +22,7 @@ local DEFAULTS = {
         RaidFrames = true,
         LootFrame = true,
         SpellBook = true,
+        Talents = true,
         Bags = true,
         Vendor = true,
     },
