@@ -25,7 +25,7 @@ ns.Gather = Gather
 local BLOB = "Gather"
 local MERGE_DISTANCE = 0.004
 local PIN_SIZE = 12
-local PIN_LEVEL = 1500 -- under Blizzard's pins (2000+), over the map art
+local PIN_LEVEL_FALLBACK = 2100 -- above the map art pins (2000+), used when the level manager is missing
 local ICONS = {
     m = "Interface\\Icons\\Trade_Mining",
     h = "Interface\\Icons\\Trade_Herbalism",
@@ -244,6 +244,23 @@ local function canvas()
     return WorldMapFrame and WorldMapFrame.ScrollContainer and WorldMapFrame.ScrollContainer.Child
 end
 
+-- The explored map art itself is drawn by pins (PIN_FRAME_LEVEL_MAP_EXPLORATION,
+-- the lowest pin levels), so anything under the pin levels is hidden by the
+-- map. Our pins take the area-POI level: above the art and highlights, under
+-- quests, vignettes and the player arrow.
+local function pinLevel()
+    local manager = WorldMapFrame
+        and WorldMapFrame.GetPinFrameLevelsManager
+        and WorldMapFrame:GetPinFrameLevelsManager()
+    if manager and manager.GetFrameLevelStart then
+        local ok, level = pcall(manager.GetFrameLevelStart, manager, "PIN_FRAME_LEVEL_AREA_POI")
+        if ok and type(level) == "number" then
+            return level
+        end
+    end
+    return PIN_LEVEL_FALLBACK
+end
+
 local attachToMap -- defined below, used by RefreshMap
 
 local function getPin(index)
@@ -253,7 +270,7 @@ local function getPin(index)
     end
     pin = CreateFrame("Button", nil, overlay)
     pin:SetSize(PIN_SIZE, PIN_SIZE)
-    pin:SetFrameLevel(PIN_LEVEL)
+    pin:SetFrameLevel(pinLevel())
     pin.Icon = pin:CreateTexture(nil, "ARTWORK")
     pin.Icon:SetAllPoints()
     pin.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -345,6 +362,7 @@ function Gather.RefreshMap()
         return
     end
     load()
+    overlay:SetFrameLevel(pinLevel())
     local mapID = WorldMapFrame:GetMapID()
     local used = 0
     local shown = settings()
@@ -368,6 +386,7 @@ function Gather.RefreshMap()
                         end
                     end
                     placePin(pin, x, y)
+                    pin:SetFrameLevel(pinLevel())
                     pin:Show()
                 end
             end
@@ -425,7 +444,7 @@ attachToMap = function()
     end
     overlay = CreateFrame("Frame", "FCUI_GatherOverlay", canvas())
     overlay:SetAllPoints()
-    overlay:SetFrameLevel(PIN_LEVEL)
+    overlay:SetFrameLevel(pinLevel())
     createCheck("showMining", "Mining", 12)
     createCheck("showHerbs", "Herbs", 84)
     if WorldMapFrame.OnMapChanged then
