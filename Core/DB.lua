@@ -226,9 +226,19 @@ end
 -- At login the cvar wins, then the per-character copy, then the account copy.
 local CVAR = "EfinixClassicUISettings"
 
+-- Every store is registered here, at ADDON_LOADED. The settings cvar, which
+-- is registered this early, came back after full client restarts although no
+-- WTF file on disk holds it; the bank and gather blobs, registered later at
+-- PLAYER_LOGIN, did not. So all blob cvars are registered at the same point.
+local BLOB_KEYS = { "Bank", "Gather" }
+local registerBlobCVar -- defined with the blob store below
+
 function DB.RegisterCVar()
     if C_CVar and C_CVar.RegisterCVar and C_CVar.GetCVar and C_CVar.GetCVar(CVAR) == nil then
         pcall(C_CVar.RegisterCVar, CVAR, "")
+    end
+    for _, key in ipairs(BLOB_KEYS) do
+        registerBlobCVar(key)
     end
 end
 
@@ -272,10 +282,26 @@ local function blobCVar(key)
     return "EfinixClassicUI" .. key
 end
 
-local function registerBlobCVar(key)
+registerBlobCVar = function(key)
     if C_CVar and C_CVar.RegisterCVar and C_CVar.GetCVar and C_CVar.GetCVar(blobCVar(key)) == nil then
         pcall(C_CVar.RegisterCVar, blobCVar(key), "")
     end
+end
+
+-- For /fcui status: where each blob currently is and how long it is.
+function DB.BlobReport()
+    local parts = {}
+    for _, key in ipairs(BLOB_KEYS) do
+        local cvarValue = C_CVar and C_CVar.GetCVar and C_CVar.GetCVar(blobCVar(key))
+        local char = EfinixClassicUICharSettings
+        local saved = type(char) == "table" and char["blob_" .. key]
+        parts[#parts + 1] = ("%s: cvar %s, saved %s"):format(
+            key,
+            type(cvarValue) == "string" and (#cvarValue .. " chars") or "none",
+            type(saved) == "string" and (#saved .. " chars") or "none"
+        )
+    end
+    return table.concat(parts, "; ")
 end
 
 function DB.GetBlob(key)

@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-23.60" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-24.62" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -208,8 +208,17 @@ ns.RegisterEvent("ADDON_LOADED", ns, function(_, _, loaded)
         ns.DB.Load()
         ns.DB.loadedAt = "ADDON_LOADED(defaults)"
     end
+    -- The saved globals hold real data from the first moment: a session that
+    -- ends before PLAYER_LOGIN (quit at the loading screen, a character
+    -- switch) otherwise makes the game write the files back as nil.
+    ns.DB.Flush()
     ns.Assets.Verify()
     ns.loaded = true
+end)
+
+-- Registered at load, not at PLAYER_LOGIN, for the same reason.
+ns.RegisterEvent("PLAYER_LOGOUT", ns, function()
+    ns.DB.Flush()
 end)
 
 -- the saved table may only appear after ADDON_LOADED; take it as soon as it does
@@ -230,9 +239,6 @@ ns.RegisterEvent("PLAYER_LOGIN", ns, function()
         if ns.DB.Adopt("PLAYER_ENTERING_WORLD") then
             ns.Print("saved settings arrived late, /reload once to apply them")
         end
-        ns.DB.Flush()
-    end)
-    ns.RegisterEvent("PLAYER_LOGOUT", ns, function()
         ns.DB.Flush()
     end)
     ns.RegisterEvent("PLAYER_ENTERING_WORLD", ns, function()
@@ -297,6 +303,7 @@ local function status()
             ns.Print(line)
         end
     end
+    ns.Print("stores: %s", ns.DB.BlobReport())
     ns.Print(
         "settings now: darkMode=%s Bags=%s (encoded %s chars, saved global=%s)",
         tostring(ns.db.darkMode),

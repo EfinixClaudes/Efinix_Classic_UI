@@ -140,9 +140,9 @@ BAGS
 ----
 
 Press B or click the backpack as usual, everything opens in one window drawn
-from the 2006 bag art: the ring with the backpack at the top left, the leather
-title bar, one carved cell per slot and the bag's bottom edge. The bank window
-uses the old bank bag art.
+from the 2006 bag art: the leather strip with the bag icons at the top, one
+carved cell per slot and the bag's bottom edge. The bank window uses the old
+bank bag art.
 Click a bag icon at the top of the window to hide or show that bag's slots.
 Drag a bag icon off to unequip that bag, or drop a bag onto an icon to equip it
 there (or swap it with the bag already in that slot). Hovering an icon shows the
@@ -171,10 +171,14 @@ SETTINGS
 --------
 
 Settings are saved per character, with an account-wide copy that a new character
-starts from. The Forever beta client only reads addon settings back when the saved
-file contains nothing but text, so the addon stores everything as one text line,
-and keeps that line in a game setting of its own as well, because the beta loads
-saved files back only some of the time. The bank snapshot is stored the same way.
+starts from. The Forever beta client is unreliable about reading addon files back,
+in particular on a second login within one game session, and a session that read
+nothing writes nothing back, which loses the file. The addon therefore stores
+everything as one text line, keeps that line in a game setting of its own as well
+(that one survives character switches within a session), and writes the files at
+the very start of every session. The bank snapshot and the gathering spots are
+stored the same way. If something is lost after a restart, that is the beta client,
+not a setting you changed.
 
 
 PROBLEMS

@@ -129,11 +129,11 @@ local function encodeSnapshot(cache)
             table.concat(slots, "/")
         )
     end
-    return ("%s|%d|%s"):format(ns.DB.Escape(charKey()), cache.seen or 0, table.concat(tabs, ";"))
+    return ("%s#%d#%s"):format(ns.DB.Escape(charKey()), cache.seen or 0, table.concat(tabs, ";"))
 end
 
 local function decodeSnapshot(entry)
-    local seen, tabsText = entry:match("^[^|]*|([^|]*)|(.*)$")
+    local seen, tabsText = entry:match("^[^|#]*[|#]([^|#]*)[|#](.*)$")
     if not seen then
         return nil
     end
@@ -165,26 +165,30 @@ local function decodeSnapshot(entry)
     return cache
 end
 
+local function entryIsMine(entry)
+    local key = ns.DB.Escape(charKey())
+    local separator = entry:sub(#key + 1, #key + 1)
+    return entry:sub(1, #key) == key and (separator == "#" or separator == "|")
+end
+
 local function loadBankCache()
     local blob = ns.DB.GetBlob(BANK_BLOB)
     if type(blob) ~= "string" then
         return
     end
-    local mine = ns.DB.Escape(charKey()) .. "|"
     for entry in blob:gmatch("[^&]+") do
-        if entry:sub(1, #mine) == mine then
+        if entryIsMine(entry) then
             bankCache = decodeSnapshot(entry)
         end
     end
 end
 
 local function saveBankCache()
-    local mine = ns.DB.Escape(charKey()) .. "|"
     local entries = { encodeSnapshot(bankCache) }
     local blob = ns.DB.GetBlob(BANK_BLOB)
     if type(blob) == "string" then
         for entry in blob:gmatch("[^&]+") do
-            if entry:sub(1, #mine) ~= mine then
+            if not entryIsMine(entry) then
                 entries[#entries + 1] = entry
             end
         end
@@ -330,8 +334,10 @@ local ART = "Interface\\ContainerFrame\\UI-Bag-Components"
 local ART_BANK = "Interface\\ContainerFrame\\UI-Bag-Components-Bank"
 local SHEET_W, SHEET_H = 256, 512
 local EDGE_LEFT, EDGE_RIGHT = 3, 12
-local TOP_BAND = 48
-local STRIP = 30 -- bag icons above the cells, search/sort/money below
+-- the 1.12 title band (ring, name bar, close box) is left out: the bag icon row already shows the bags
+local TOP_BAND = 0
+local STRIP = 30 -- search/sort/money below the cells
+local STRIP_TOP = 34 -- bag icons above the cells, with the close button at its right end
 local BOTTOM = 10
 local CELL = SLOT + SPACING -- 41: one baked cell per item button
 local CELL_TEXELS = 41.5
@@ -340,6 +346,7 @@ local CELL_INSET = 3 -- the 37 px button inside its 41 px cell
 local ROW_V0, ROW_V1 = 213, 254
 local TOP_V0, TOP_V1 = 2, 50
 local LEATHER_V0, LEATHER_V1 = 30, 48
+local LEATHER_EDGE_V0 = 26 -- includes the bar's bottom line, a top edge for the strip that starts the window
 local BOTTOM_V0, BOTTOM_V1 = 169, 179
 
 local function artAvailable(file)
@@ -358,10 +365,10 @@ local function chromeTexture(window)
 end
 
 -- left border, stretched leather, right border: the bag-icon strip and the footer
-local function createStrip(window)
+local function createStrip(window, withTopEdge)
     local strip = { left = chromeTexture(window), fill = chromeTexture(window), right = chromeTexture(window) }
     coords(strip.left, 73, 76, ROW_V0, ROW_V1)
-    coords(strip.fill, 122, 218, LEATHER_V0, LEATHER_V1)
+    coords(strip.fill, 122, 218, withTopEdge and LEATHER_EDGE_V0 or LEATHER_V0, LEATHER_V1)
     coords(strip.right, 242, 254, ROW_V0, ROW_V1)
     return strip
 end
@@ -378,19 +385,21 @@ end
 local function createChrome(window)
     local chrome = { rows = {} }
     window.chrome = chrome
-    chrome.topLeft = chromeTexture(window)
-    coords(chrome.topLeft, 66, 122, TOP_V0, TOP_V1)
-    chrome.topLeft:SetSize(56, TOP_BAND)
-    chrome.topLeft:SetPoint("TOPLEFT", window, "TOPLEFT", -7, 0) -- the ring overhangs the border as in 1.12
-    chrome.topFill = chromeTexture(window)
-    coords(chrome.topFill, 122, 218, TOP_V0, TOP_V1)
-    chrome.topFill:SetPoint("TOPLEFT", chrome.topLeft, "TOPRIGHT", 0, 0)
-    chrome.topRight = chromeTexture(window)
-    coords(chrome.topRight, 218, 254, TOP_V0, TOP_V1)
-    chrome.topRight:SetSize(36, TOP_BAND)
-    chrome.topRight:SetPoint("TOPRIGHT", window, "TOPRIGHT", 0, 0)
-    chrome.topFill:SetPoint("BOTTOMRIGHT", chrome.topRight, "BOTTOMLEFT", 0, 0)
-    chrome.toggleStrip = createStrip(window)
+    if TOP_BAND > 0 then
+        chrome.topLeft = chromeTexture(window)
+        coords(chrome.topLeft, 66, 122, TOP_V0, TOP_V1)
+        chrome.topLeft:SetSize(56, TOP_BAND)
+        chrome.topLeft:SetPoint("TOPLEFT", window, "TOPLEFT", -7, 0) -- the ring overhangs the border as in 1.12
+        chrome.topFill = chromeTexture(window)
+        coords(chrome.topFill, 122, 218, TOP_V0, TOP_V1)
+        chrome.topFill:SetPoint("TOPLEFT", chrome.topLeft, "TOPRIGHT", 0, 0)
+        chrome.topRight = chromeTexture(window)
+        coords(chrome.topRight, 218, 254, TOP_V0, TOP_V1)
+        chrome.topRight:SetSize(36, TOP_BAND)
+        chrome.topRight:SetPoint("TOPRIGHT", window, "TOPRIGHT", 0, 0)
+        chrome.topFill:SetPoint("BOTTOMRIGHT", chrome.topRight, "BOTTOMLEFT", 0, 0)
+    end
+    chrome.toggleStrip = createStrip(window, TOP_BAND == 0)
     chrome.footer = createStrip(window)
     chrome.bottomLeft = chromeTexture(window)
     coords(chrome.bottomLeft, 73, 90, BOTTOM_V0, BOTTOM_V1)
@@ -411,8 +420,8 @@ local function layoutChrome(window, columns, rows)
     local chrome = window.chrome
     local width = EDGE_LEFT + columns * CELL + EDGE_RIGHT
     local y = -TOP_BAND
-    placeStrip(chrome.toggleStrip, window, y, STRIP, width)
-    y = y - STRIP
+    placeStrip(chrome.toggleStrip, window, y, STRIP_TOP, width)
+    y = y - STRIP_TOP
     for row = 1, rows do
         local pieces = chrome.rows[row]
         if not pieces then
@@ -453,7 +462,7 @@ local function layoutChrome(window, columns, rows)
         end
     end
     placeStrip(chrome.footer, window, y, STRIP, width)
-    return width, TOP_BAND + STRIP + rows * CELL + STRIP + BOTTOM
+    return width, TOP_BAND + STRIP_TOP + rows * CELL + STRIP + BOTTOM
 end
 
 ---------------------------------------------------------------------------
@@ -824,7 +833,7 @@ end
 
 local function layoutToggles(window, bagIDs)
     local x = window.chrome and 8 or PADDING
-    local y = window.chrome and -(TOP_BAND + 3) or -30
+    local y = window.chrome and -(TOP_BAND + 5) or -30
     for index, bagID in ipairs(bagIDs) do
         local toggle = getToggle(window, index)
         toggle.bagID = bagID
@@ -1085,24 +1094,19 @@ local function createWindow(kind, title)
     window:Hide()
 
     if window.chrome then
-        -- ContainerFrame.xml: portrait 40x40 at 7,-5 (from the sheet's left, 9 px left of our border),
-        -- name in GameFontHighlight at 47,-10 inside the leather bar
-        window.Portrait = window:CreateTexture(nil, "BORDER")
-        window.Portrait:SetSize(40, 40)
-        window.Portrait:SetPoint("TOPLEFT", window, "TOPLEFT", -2, -5)
-        window.Portrait:SetTexture(
-            kind == "bank" and "Interface\\Icons\\INV_Misc_Coin_02"
-                or (Assets.Get("Bags.Backpack") or "Interface\\Buttons\\Button-Backpack-Up")
-        )
-        window.Portrait:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        window.Title = window:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        window.Title:SetPoint("TOPLEFT", window, "TOPLEFT", 40, -10)
-        window.Title:SetJustifyH("LEFT")
+        -- no title band: the name (for the bank, with the snapshot time) sits in the
+        -- bag icon strip left of the close button; the inventory needs no name at all
+        window.Title = window:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        window.Title:SetPoint("TOPRIGHT", window, "TOPRIGHT", -38, -11)
+        window.Title:SetJustifyH("RIGHT")
     else
         window.Title = window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         window.Title:SetPoint("TOP", window, "TOP", 0, -12)
     end
     window.Title:SetText(title)
+    if window.chrome and kind == "inventory" then
+        window.Title:Hide()
+    end
 
     window.Close = createCloseButton(window, function()
         Bags.Close(kind)
@@ -1110,7 +1114,13 @@ local function createWindow(kind, title)
 
     window.Items = CreateFrame("Frame", nil, window)
     if window.chrome then
-        window.Items:SetPoint("TOPLEFT", window, "TOPLEFT", EDGE_LEFT + CELL_INSET, -(TOP_BAND + STRIP + CELL_INSET))
+        window.Items:SetPoint(
+            "TOPLEFT",
+            window,
+            "TOPLEFT",
+            EDGE_LEFT + CELL_INSET,
+            -(TOP_BAND + STRIP_TOP + CELL_INSET)
+        )
     else
         window.Items:SetPoint("TOPLEFT", window, "TOPLEFT", PADDING, -HEADER)
     end

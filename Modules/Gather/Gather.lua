@@ -465,6 +465,7 @@ function Gather.Command(rest)
         #nodes.h,
         count
     )
+    ns.Print("  stores: %s", ns.DB.BlobReport())
     ns.Print("  /fcui gather clear [mining|herbs] forgets them")
 end
 
