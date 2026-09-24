@@ -359,6 +359,14 @@ function Gather.RefreshMap()
                     pin.node = node
                     pin.profession = profession
                     pin.Icon:SetTexture(ICONS[profession])
+                    if not pin.Icon:GetTexture() then
+                        -- icon file not on this client: a plain coloured dot
+                        if profession == "m" then
+                            pin.Icon:SetColorTexture(1, 0.8, 0.2, 1)
+                        else
+                            pin.Icon:SetColorTexture(0.3, 0.9, 0.3, 1)
+                        end
+                    end
                     placePin(pin, x, y)
                     pin:Show()
                 end
@@ -544,4 +552,37 @@ function Gather:Diag()
         tostring(settings().showHerbs),
         Gather.lastRefresh
     )
+    local child = canvas()
+    if child then
+        ns.Print(
+            "  canvas %.0fx%.0f scale %.2f level %d shown=%s; overlay level %s shown=%s",
+            child:GetWidth(),
+            child:GetHeight(),
+            child:GetEffectiveScale(),
+            child:GetFrameLevel(),
+            tostring(child:IsVisible()),
+            tostring(overlay and overlay:GetFrameLevel()),
+            tostring(overlay and overlay:IsVisible())
+        )
+    end
+    local pin = pins[1]
+    if pin then
+        local point, relativeTo, relativePoint, x, y = pin:GetPoint(1)
+        ns.Print(
+            "  pin1 shown=%s visible=%s %s -> %s %s (%.0f, %.0f) size %.0f scale %.2f level %d texture=%s",
+            tostring(pin:IsShown()),
+            tostring(pin:IsVisible()),
+            tostring(point),
+            tostring(relativeTo and relativeTo:GetName()),
+            tostring(relativePoint),
+            x or 0,
+            y or 0,
+            pin:GetWidth(),
+            pin:GetScale(),
+            pin:GetFrameLevel(),
+            tostring(pin.Icon:GetTexture())
+        )
+    else
+        ns.Print("  no pin frames created yet")
+    end
 end
