@@ -123,7 +123,9 @@ while casting) the point stays placed and an Apply button appears; right-click
 takes such an unapplied point back. Dual talent specs are not shown yet; the
 game's own window still has them (turn the Talents part off for that).
 Gathering: every ore vein and herb you gather is remembered with its spot, and
-the M map shows them as small pick and leaf pins. Two checkboxes at the bottom
+the M map shows them as small pins carrying the icon of the ore or herb they
+give, so an iron deposit reads as iron ore at a glance (a plain pick or leaf
+when the icon is not known yet). Two checkboxes at the bottom
 left of the map, "Mining" and "Herbs", show or hide them. Nobody has recorded
 Forever's node spawns yet, so the map fills in as you play; after a few laps of
 a zone the route through its nodes is on the map. Hover a pin for the node's

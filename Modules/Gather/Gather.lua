@@ -32,6 +32,66 @@ local ICONS = {
 }
 local LABELS = { m = "Mining", h = "Herbs" }
 
+-- Per-node icons: the icon of the item the node yields. The client's item
+-- cache is asked first (an ore or herb you have gathered is cached), these
+-- Vanilla icons are the backup, and the pick or leaf the last resort.
+local ICON_PATH = "Interface\\Icons\\"
+local KNOWN_ICONS = {
+    ["copper ore"] = ICON_PATH .. "INV_Ore_Copper_01",
+    ["tin ore"] = ICON_PATH .. "INV_Ore_Tin_01",
+    ["silver ore"] = ICON_PATH .. "INV_Ore_Silver_01",
+    ["iron ore"] = ICON_PATH .. "INV_Ore_Iron_01",
+    ["gold ore"] = ICON_PATH .. "INV_Ore_Gold_01",
+    ["mithril ore"] = ICON_PATH .. "INV_Ore_Mithril_02",
+    ["truesilver ore"] = ICON_PATH .. "INV_Ore_TrueSilver_01",
+    ["dark iron ore"] = ICON_PATH .. "INV_Ore_Mithril_01",
+    ["thorium ore"] = ICON_PATH .. "INV_Ore_Thorium_02",
+    ["peacebloom"] = ICON_PATH .. "INV_Misc_Flower_02",
+    ["silverleaf"] = ICON_PATH .. "INV_Misc_Herb_10",
+    ["earthroot"] = ICON_PATH .. "INV_Misc_Root_01",
+    ["golden sansam"] = ICON_PATH .. "INV_Misc_Herb_SansamRoot",
+    ["dreamfoil"] = ICON_PATH .. "INV_Misc_Herb_Dreamfoil",
+    ["mountain silversage"] = ICON_PATH .. "INV_Misc_Herb_SilverSage",
+    ["plaguebloom"] = ICON_PATH .. "INV_Misc_Herb_Plaguebloom",
+    ["icecap"] = ICON_PATH .. "INV_Misc_Herb_Icecap",
+    ["black lotus"] = ICON_PATH .. "INV_Misc_Herb_BlackLotus",
+}
+local iconCache = {} -- item name (lower) -> icon | false
+
+-- "Ooze Covered Rich Thorium Vein" -> "Thorium Ore", "Iron Deposit" -> "Iron Ore"
+local function itemNameFor(profession, nodeName)
+    if type(nodeName) ~= "string" or nodeName == "" then
+        return nil
+    end
+    local name = nodeName:gsub("^Ooze Covered ", ""):gsub("^Rich ", ""):gsub("^Small ", "")
+    if profession == "m" then
+        name = name:gsub(" Mineral Vein$", " Ore"):gsub(" Vein$", " Ore"):gsub(" Deposit$", " Ore")
+    end
+    return name
+end
+
+local function iconFor(profession, nodeName)
+    local item = itemNameFor(profession, nodeName)
+    if not item then
+        return nil
+    end
+    local key = item:lower()
+    local cached = iconCache[key]
+    if cached ~= nil then
+        return cached or nil
+    end
+    local icon
+    if C_Item and C_Item.GetItemIconByID then
+        local ok, result = pcall(C_Item.GetItemIconByID, item)
+        if ok and type(result) == "number" and result > 0 then
+            icon = result
+        end
+    end
+    icon = icon or KNOWN_ICONS[key]
+    iconCache[key] = icon or false
+    return icon
+end
+
 -- Gather spells of every rank, Classic through Retail; the names are the
 -- fallback for ranks this list does not know (enUS).
 local MINING_SPELLS = {
@@ -121,18 +181,20 @@ local function load()
 end
 
 local function encodeNode(p, node)
-    return ("%s,%d,%d,%d,%d,%s"):format(
+    return ("%s,%d,%d,%d,%d,%s,%s"):format(
         p,
         node.map,
         math.floor(node.x * 10000 + 0.5),
         math.floor(node.y * 10000 + 0.5),
         node.count,
-        ns.DB.Escape(node.name or "")
+        ns.DB.Escape(node.name or ""),
+        type(node.icon) == "number" and tostring(node.icon) or ""
     )
 end
 
+-- the icon field is optional (older entries have six fields)
 local function decodeNode(entry)
-    local p, map, x, y, count, name = entry:match("^([mh]),(%d+),(%d+),(%d+),(%d+),(.*)$")
+    local p, map, x, y, count, name, icon = entry:match("^([mh]),(%d+),(%d+),(%d+),(%d+),([^,]*),?(%d*)$")
     if not p then
         return nil
     end
@@ -143,6 +205,7 @@ local function decodeNode(entry)
             y = tonumber(y) / 10000,
             count = tonumber(count) or 1,
             name = ns.DB.Unescape(name),
+            icon = tonumber(icon),
         }
 end
 
@@ -235,7 +298,15 @@ local function record(profession, name)
             return
         end
     end
-    list[#list + 1] = { map = mapID, x = x, y = y, count = 1, name = name or "" }
+    local icon = iconFor(profession, name)
+    list[#list + 1] = {
+        map = mapID,
+        x = x,
+        y = y,
+        count = 1,
+        name = name or "",
+        icon = type(icon) == "number" and icon or nil,
+    }
     save()
     Gather.RefreshMap()
     local mapName = C_Map.GetMapInfo and C_Map.GetMapInfo(mapID)
@@ -417,7 +488,11 @@ function Gather.RefreshMap()
                     local pin = getPin(used)
                     pin.node = node
                     pin.profession = profession
-                    pin.Icon:SetTexture(ICONS[profession])
+                    local icon = node.icon or iconFor(profession, node.name)
+                    if type(icon) == "number" and not node.icon then
+                        node.icon = icon -- learned from the cache; saved with the next change
+                    end
+                    pin.Icon:SetTexture(icon or ICONS[profession])
                     if not pin.Icon:GetTexture() then
                         -- icon file not on this client: a plain coloured dot
                         if profession == "m" then
