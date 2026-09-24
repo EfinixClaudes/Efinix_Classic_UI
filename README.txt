@@ -52,6 +52,9 @@ COMMANDS  (type them in the chat box)
                             addon (also: share party, share raid, share <player>)
 /fcui gather request guild  asks the guild (or party, raid) for their spots; the
                             answers come as whispers and are taken for three minutes
+/fcui gather sync           asks the guild right now who holds spots and pulls from the
+                            two largest holders (this also happens on its own at login)
+/fcui gather auto off       stops the automatic sync at login ("on" to start again)
 /fcui gather trust <name>   always take spots whispered by that player (again to undo)
 /fcui gather whispers on    take spots whispered by anyone ("off" to stop)
 /fcui gather answer off     stop answering requests ("on" to answer again)
@@ -125,11 +128,14 @@ left of the map, "Mining" and "Herbs", show or hide them. Nobody has recorded
 Forever's node spawns yet, so the map fills in as you play; after a few laps of
 a zone the route through its nodes is on the map. Hover a pin for the node's
 name and how often you gathered it there.
-Players who run the addon can pool their spots: "/fcui gather share guild" sends
-yours to the guild, "/fcui gather request guild" asks them for theirs. Spots from
-guild, party and raid members are taken as they arrive; a whisper from someone
-else counts only while your request is open, or from a player you trust. The
-same spot from several players adds up its count, so the busy veins stand out.
+Players who run the addon pool their spots by themselves: about twenty seconds
+after you log in, the addon asks the guild who holds spots, everyone with the
+addon answers, and your map takes the whole map of the two largest holders. A
+holder sends you at most once in twelve hours, so nobody floods the guild.
+"/fcui gather share guild" and "/fcui gather request guild" do it by hand, also
+for party and raid. Spots from guild, party and raid members are taken as they
+arrive; a whisper from someone else counts only while your request is open, or
+from a player you trust. A spot several players know keeps the highest count.
 Quest watch: the tracked quests are a plain text list under the minimap as in
 2006, yellow titles with their objectives below, finished objectives greyed.
 They are grouped under their quest-log zone headers, and each zone folds with

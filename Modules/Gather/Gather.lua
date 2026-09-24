@@ -156,8 +156,9 @@ local function save()
     ns.DB.SetBlob(BLOB, table.concat(parts, ";"))
 end
 
--- Merge one spot into the list: a known spot within MERGE_DISTANCE takes
--- the count, anything else is new. Returns true when it was new.
+-- Merge one received spot into the list: a known spot within MERGE_DISTANCE
+-- keeps the larger count (the same map arriving twice must change nothing),
+-- anything else is new. Returns true when it was new.
 local function merge(p, incoming)
     local list = nodes[p]
     for _, node in ipairs(list) do
@@ -166,7 +167,7 @@ local function merge(p, incoming)
             and math.abs(node.x - incoming.x) < MERGE_DISTANCE
             and math.abs(node.y - incoming.y) < MERGE_DISTANCE
         then
-            node.count = math.min(999, node.count + (incoming.count or 1))
+            node.count = math.min(999, math.max(node.count, incoming.count or 1))
             if (node.name == nil or node.name == "") and incoming.name and incoming.name ~= "" then
                 node.name = incoming.name
             end
@@ -505,10 +506,18 @@ end
 --   "S" .. entries      spots, one chunk of whole entries per message
 --   "E" .. count        end of a share, count sent
 --   "R"                 request: please share your spots with me
+--   "H"                 hello (guild, at login): who has spots?
+--   "N" .. count        answer to a hello: I hold that many spots
 -- Spots from guild, party and raid members are taken as they come; spots
 -- whispered by anyone else only while a request of ours is open, or from a
 -- player you trust, or when whispers are accepted in general. Sending is
 -- paced at five messages a second.
+--
+-- Automatic sync at login: hello to the guild, every member with the addon
+-- answers with a count, and after a few seconds the two largest holders are
+-- asked for their whole map. A holder sends a given player at most once in
+-- twelve hours, and a "R" by whisper is only answered right after such an
+-- exchange (or from a trusted player), so nobody outside can pull maps.
 ---------------------------------------------------------------------------
 local PREFIX = "FCUIGather"
 local CHUNK = 240
@@ -519,6 +528,13 @@ local sendTicker
 local requestedAt = 0
 local incoming = {} -- sender -> { new, total, timer }
 local saveTimer
+local HELLO_WAIT = 8
+local SYNC_SOURCES = 2
+local SYNC_REPEAT = 12 * 60 * 60
+local helloAt = 0
+local offers = {} -- sender -> count, answers to our hello
+local offered = {} -- sender -> GetTime() when we answered their hello
+local helloTimer
 
 local function myName()
     local name = UnitName("player")
@@ -583,6 +599,43 @@ local function channelFor(word)
     return nil, "say guild, party, raid or a player name"
 end
 
+local function totalSpots()
+    return #nodes.m + #nodes.h
+end
+
+-- after the hello wait: pull the whole map from the largest holders
+local function finishHello()
+    helloTimer = nil
+    local list = {}
+    for sender, count in pairs(offers) do
+        if count > 0 then
+            list[#list + 1] = { sender = sender, count = count }
+        end
+    end
+    offers = {}
+    table.sort(list, function(a, b)
+        return a.count > b.count
+    end)
+    local asked = {}
+    for i = 1, math.min(SYNC_SOURCES, #list) do
+        queue("WHISPER", shortName(list[i].sender), "R")
+        asked[#asked + 1] = shortName(list[i].sender) .. " (" .. list[i].count .. ")"
+    end
+    if #asked > 0 then
+        requestedAt = GetTime()
+        ns.Print("gather: syncing spots from %s", table.concat(asked, ", "))
+    end
+end
+
+local function sendHello()
+    if settings().autoSync == false or not (IsInGuild and IsInGuild()) then
+        return
+    end
+    helloAt = GetTime()
+    offers = {}
+    queue("GUILD", nil, "H")
+end
+
 local function acceptFrom(channel, sender)
     local settingsTable = settings()
     if channel == "GUILD" or channel == "PARTY" or channel == "RAID" or channel == "INSTANCE_CHAT" then
@@ -637,8 +690,39 @@ local function onAddonMessage(_, _, prefix, text, channel, sender)
         return -- our own broadcast coming back
     end
     local kind = text:sub(1, 1)
-    if kind == "R" then
-        if settings().answerRequests ~= false and channel ~= "WHISPER" then
+    local key = shortName(sender):lower()
+    if kind == "H" then
+        -- someone logged in: tell them what we hold, guild only
+        if channel == "GUILD" and settings().autoSync ~= false and settings().answerRequests ~= false then
+            load()
+            local synced = settings().syncedWith or {}
+            if totalSpots() > 0 and GetTime() > 0 and (time() - (synced[key] or 0)) > SYNC_REPEAT then
+                offered[sender] = GetTime()
+                queue("WHISPER", shortName(sender), "N" .. totalSpots())
+            end
+        end
+        return
+    elseif kind == "N" then
+        if GetTime() - helloAt < HELLO_WAIT + 2 and channel == "WHISPER" then
+            offers[sender] = tonumber(text:sub(2)) or 0
+            if not helloTimer then
+                helloTimer = C_Timer.NewTimer(HELLO_WAIT, finishHello)
+            end
+        end
+        return
+    elseif kind == "R" then
+        if settings().answerRequests == false then
+            return
+        end
+        local trusted = settings().trusted or {}
+        local fromGroup = channel ~= "WHISPER"
+        local afterHello = offered[sender] ~= nil and GetTime() - offered[sender] < 120
+        if fromGroup or afterHello or trusted[key] then
+            if afterHello then
+                settings().syncedWith = settings().syncedWith or {}
+                settings().syncedWith[key] = time()
+                ns.DB.Flush()
+            end
             shareTo("WHISPER", shortName(sender))
         end
         return
@@ -739,6 +823,15 @@ function Gather.Command(rest)
         ns.DB.Flush()
         ns.Print("gather: requests from guild, party and raid are %s", arg == "on" and "answered" or "ignored")
         return
+    elseif word == "auto" and (arg == "on" or arg == "off") then
+        settings().autoSync = arg == "on"
+        ns.DB.Flush()
+        ns.Print("gather: automatic guild sync at login is %s", arg == "on" and "on" or "off")
+        return
+    elseif word == "sync" then
+        sendHello()
+        ns.Print("gather: asked the guild who holds spots")
+        return
     end
     if rest == "clear" or rest == "clear mining" or rest == "clear herbs" then
         if rest == "clear" then
@@ -768,8 +861,8 @@ function Gather.Command(rest)
         count
     )
     ns.Print("  stores: %s", ns.DB.BlobReport())
-    ns.Print("  share guild|party|raid|<player>, request guild|party|raid, trust <player>,")
-    ns.Print("  whispers on|off, answer on|off, clear [mining|herbs]")
+    ns.Print("  share guild|party|raid|<player>, request guild|party|raid, sync, trust <player>,")
+    ns.Print("  auto on|off, whispers on|off, answer on|off, clear [mining|herbs]")
 end
 
 function Gather:Init()
@@ -783,6 +876,12 @@ function Gather:Enable()
     if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
         pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX)
         ns.RegisterEvent("CHAT_MSG_ADDON", self, onAddonMessage)
+        -- the guild roster and the others' addons need a moment after login
+        ns.RegisterEvent("PLAYER_ENTERING_WORLD", self, function(_, _, isLogin, isReload)
+            if isLogin or isReload then
+                C_Timer.After(20, sendHello)
+            end
+        end)
     end
     if canvas() then
         attachToMap()
