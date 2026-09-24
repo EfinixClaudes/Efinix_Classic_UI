@@ -120,21 +120,61 @@ local function load()
     end
 end
 
+local function encodeNode(p, node)
+    return ("%s,%d,%d,%d,%d,%s"):format(
+        p,
+        node.map,
+        math.floor(node.x * 10000 + 0.5),
+        math.floor(node.y * 10000 + 0.5),
+        node.count,
+        ns.DB.Escape(node.name or "")
+    )
+end
+
+local function decodeNode(entry)
+    local p, map, x, y, count, name = entry:match("^([mh]),(%d+),(%d+),(%d+),(%d+),(.*)$")
+    if not p then
+        return nil
+    end
+    return p,
+        {
+            map = tonumber(map),
+            x = tonumber(x) / 10000,
+            y = tonumber(y) / 10000,
+            count = tonumber(count) or 1,
+            name = ns.DB.Unescape(name),
+        }
+end
+
 local function save()
     local parts = {}
     for p, list in pairs(nodes) do
         for _, node in ipairs(list) do
-            parts[#parts + 1] = ("%s,%d,%d,%d,%d,%s"):format(
-                p,
-                node.map,
-                math.floor(node.x * 10000 + 0.5),
-                math.floor(node.y * 10000 + 0.5),
-                node.count,
-                ns.DB.Escape(node.name or "")
-            )
+            parts[#parts + 1] = encodeNode(p, node)
         end
     end
     ns.DB.SetBlob(BLOB, table.concat(parts, ";"))
+end
+
+-- Merge one spot into the list: a known spot within MERGE_DISTANCE takes
+-- the count, anything else is new. Returns true when it was new.
+local function merge(p, incoming)
+    local list = nodes[p]
+    for _, node in ipairs(list) do
+        if
+            node.map == incoming.map
+            and math.abs(node.x - incoming.x) < MERGE_DISTANCE
+            and math.abs(node.y - incoming.y) < MERGE_DISTANCE
+        then
+            node.count = math.min(999, node.count + (incoming.count or 1))
+            if (node.name == nil or node.name == "") and incoming.name and incoming.name ~= "" then
+                node.name = incoming.name
+            end
+            return false
+        end
+    end
+    list[#list + 1] = incoming
+    return true
 end
 
 ---------------------------------------------------------------------------
@@ -461,10 +501,245 @@ attachToMap = function()
 end
 
 ---------------------------------------------------------------------------
+-- Sharing between players who run the addon (addon messages, 255 bytes each)
+--   "S" .. entries      spots, one chunk of whole entries per message
+--   "E" .. count        end of a share, count sent
+--   "R"                 request: please share your spots with me
+-- Spots from guild, party and raid members are taken as they come; spots
+-- whispered by anyone else only while a request of ours is open, or from a
+-- player you trust, or when whispers are accepted in general. Sending is
+-- paced at five messages a second.
+---------------------------------------------------------------------------
+local PREFIX = "FCUIGather"
+local CHUNK = 240
+local SEND_INTERVAL = 0.2
+local REQUEST_WINDOW = 180
+local outbox = {}
+local sendTicker
+local requestedAt = 0
+local incoming = {} -- sender -> { new, total, timer }
+local saveTimer
+
+local function myName()
+    local name = UnitName("player")
+    return name and name:lower() or ""
+end
+
+local function shortName(sender)
+    return (sender or ""):match("^([^-]+)") or sender or ""
+end
+
+local function pumpOutbox()
+    local item = table.remove(outbox, 1)
+    if not item then
+        if sendTicker then
+            sendTicker:Cancel()
+            sendTicker = nil
+        end
+        return
+    end
+    pcall(C_ChatInfo.SendAddonMessage, PREFIX, item.text, item.chatType, item.target)
+end
+
+local function queue(chatType, target, text)
+    outbox[#outbox + 1] = { chatType = chatType, target = target, text = text }
+    if not sendTicker then
+        sendTicker = C_Timer.NewTicker(SEND_INTERVAL, pumpOutbox)
+    end
+end
+
+local function shareTo(chatType, target)
+    load()
+    local chunk, count = "S", 0
+    for p, list in pairs(nodes) do
+        for _, node in ipairs(list) do
+            local entry = encodeNode(p, node)
+            if #chunk + #entry + 1 > CHUNK then
+                queue(chatType, target, chunk)
+                chunk = "S"
+            end
+            chunk = chunk .. (chunk == "S" and "" or ";") .. entry
+            count = count + 1
+        end
+    end
+    if chunk ~= "S" then
+        queue(chatType, target, chunk)
+    end
+    queue(chatType, target, "E" .. count)
+    return count
+end
+
+local function channelFor(word)
+    word = (word or ""):lower()
+    if word == "guild" then
+        return IsInGuild and IsInGuild() and "GUILD" or nil, "you are not in a guild"
+    elseif word == "party" then
+        return IsInGroup and IsInGroup() and "PARTY" or nil, "you are not in a party"
+    elseif word == "raid" then
+        return IsInRaid and IsInRaid() and "RAID" or nil, "you are not in a raid"
+    elseif word ~= "" then
+        return "WHISPER", nil, word
+    end
+    return nil, "say guild, party, raid or a player name"
+end
+
+local function acceptFrom(channel, sender)
+    local settingsTable = settings()
+    if channel == "GUILD" or channel == "PARTY" or channel == "RAID" or channel == "INSTANCE_CHAT" then
+        return settingsTable.acceptGroup ~= false
+    end
+    if channel == "WHISPER" then
+        if settingsTable.acceptWhispers then
+            return true
+        end
+        local trusted = settingsTable.trusted or {}
+        if trusted[shortName(sender):lower()] then
+            return true
+        end
+        return GetTime() - requestedAt < REQUEST_WINDOW
+    end
+    return false
+end
+
+local function reportIncoming(sender)
+    local batch = incoming[sender]
+    if not batch then
+        return
+    end
+    incoming[sender] = nil
+    ns.Print(
+        "gather: %d spot%s from %s, %d new (%d mining, %d herbs known now)",
+        batch.total,
+        batch.total == 1 and "" or "s",
+        shortName(sender),
+        batch.new,
+        #nodes.m,
+        #nodes.h
+    )
+end
+
+local function scheduleSave()
+    if saveTimer then
+        return
+    end
+    saveTimer = C_Timer.NewTimer(1, function()
+        saveTimer = nil
+        save()
+        Gather.RefreshMap()
+    end)
+end
+
+local function onAddonMessage(_, _, prefix, text, channel, sender)
+    if prefix ~= PREFIX or type(text) ~= "string" then
+        return
+    end
+    if shortName(sender):lower() == myName() then
+        return -- our own broadcast coming back
+    end
+    local kind = text:sub(1, 1)
+    if kind == "R" then
+        if settings().answerRequests ~= false and channel ~= "WHISPER" then
+            shareTo("WHISPER", shortName(sender))
+        end
+        return
+    end
+    if not acceptFrom(channel, sender) then
+        return
+    end
+    load()
+    local batch = incoming[sender]
+    if not batch then
+        batch = { new = 0, total = 0 }
+        incoming[sender] = batch
+    end
+    if batch.timer then
+        batch.timer:Cancel()
+    end
+    if kind == "S" then
+        for entry in text:sub(2):gmatch("[^;]+") do
+            local p, node = decodeNode(entry)
+            if p and node.map and node.x > 0 and node.y > 0 and node.x < 1 and node.y < 1 then
+                batch.total = batch.total + 1
+                if merge(p, node) then
+                    batch.new = batch.new + 1
+                end
+            end
+        end
+        scheduleSave()
+        -- a share without its end marker still gets reported
+        batch.timer = C_Timer.NewTimer(5, function()
+            reportIncoming(sender)
+        end)
+    elseif kind == "E" then
+        reportIncoming(sender)
+    end
+end
+
+function Gather.Share(rest)
+    local chatType, why, target = channelFor(rest)
+    if not chatType then
+        ns.Print("gather share: %s", why)
+        return
+    end
+    load()
+    local count = shareTo(chatType, target)
+    ns.Print(
+        "gather: sending %d spot%s to %s (%d messages, a few seconds)",
+        count,
+        count == 1 and "" or "s",
+        target or chatType:lower(),
+        #outbox
+    )
+end
+
+function Gather.Request(rest)
+    local chatType, why = channelFor(rest)
+    if not chatType or chatType == "WHISPER" then
+        ns.Print("gather request: %s", chatType == "WHISPER" and "say guild, party or raid" or why)
+        return
+    end
+    requestedAt = GetTime()
+    queue(chatType, nil, "R")
+    ns.Print(
+        "gather: asked the %s for their spots; whispers with spots are accepted for three minutes",
+        chatType:lower()
+    )
+end
+
+---------------------------------------------------------------------------
 -- Commands and lifecycle
 ---------------------------------------------------------------------------
 function Gather.Command(rest)
     load()
+    local word, arg = (rest or ""):match("^(%S+)%s*(.-)$")
+    if word == "share" then
+        Gather.Share(arg)
+        return
+    elseif word == "request" then
+        Gather.Request(arg)
+        return
+    elseif word == "trust" and arg ~= "" then
+        settings().trusted = settings().trusted or {}
+        local key = arg:lower()
+        settings().trusted[key] = not settings().trusted[key] or nil
+        ns.DB.Flush()
+        ns.Print(
+            "gather: spots whispered by %s are %s",
+            arg,
+            settings().trusted[key] and "accepted" or "no longer accepted"
+        )
+        return
+    elseif word == "whispers" and (arg == "on" or arg == "off") then
+        settings().acceptWhispers = arg == "on"
+        ns.DB.Flush()
+        ns.Print("gather: spots whispered by anyone are %s", arg == "on" and "accepted" or "ignored")
+        return
+    elseif word == "answer" and (arg == "on" or arg == "off") then
+        settings().answerRequests = arg == "on"
+        ns.DB.Flush()
+        ns.Print("gather: requests from guild, party and raid are %s", arg == "on" and "answered" or "ignored")
+        return
+    end
     if rest == "clear" or rest == "clear mining" or rest == "clear herbs" then
         if rest == "clear" then
             nodes = { m = {}, h = {} }
@@ -493,7 +768,8 @@ function Gather.Command(rest)
         count
     )
     ns.Print("  stores: %s", ns.DB.BlobReport())
-    ns.Print("  /fcui gather clear [mining|herbs] forgets them")
+    ns.Print("  share guild|party|raid|<player>, request guild|party|raid, trust <player>,")
+    ns.Print("  whispers on|off, answer on|off, clear [mining|herbs]")
 end
 
 function Gather:Init()
@@ -504,6 +780,10 @@ function Gather:Enable()
     load()
     ns.RegisterEvent("UNIT_SPELLCAST_SENT", self, onSent)
     ns.RegisterEvent("UNIT_SPELLCAST_SUCCEEDED", self, onSucceeded)
+    if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
+        pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX)
+        ns.RegisterEvent("CHAT_MSG_ADDON", self, onAddonMessage)
+    end
     if canvas() then
         attachToMap()
     else

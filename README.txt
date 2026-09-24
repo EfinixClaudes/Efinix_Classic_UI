@@ -48,6 +48,13 @@ COMMANDS  (type them in the chat box)
 /fcui gather                how many mining and herb spots the addon has recorded;
                             "/fcui gather clear" (or "clear mining", "clear herbs")
                             forgets them
+/fcui gather share guild    sends your spots to everyone in the guild who runs the
+                            addon (also: share party, share raid, share <player>)
+/fcui gather request guild  asks the guild (or party, raid) for their spots; the
+                            answers come as whispers and are taken for three minutes
+/fcui gather trust <name>   always take spots whispered by that player (again to undo)
+/fcui gather whispers on    take spots whispered by anyone ("off" to stop)
+/fcui gather answer off     stop answering requests ("on" to answer again)
 /fcui bags shiftsell off    turns the hold-Shift auto sell and repair off (on = back on)
 /fcui scale 1.1             makes the whole bottom bar bigger or smaller (0.5-2.0)
 /fcui dark on               dark mode: all frame art (bars, unit frames, minimap,
@@ -118,6 +125,11 @@ left of the map, "Mining" and "Herbs", show or hide them. Nobody has recorded
 Forever's node spawns yet, so the map fills in as you play; after a few laps of
 a zone the route through its nodes is on the map. Hover a pin for the node's
 name and how often you gathered it there.
+Players who run the addon can pool their spots: "/fcui gather share guild" sends
+yours to the guild, "/fcui gather request guild" asks them for theirs. Spots from
+guild, party and raid members are taken as they arrive; a whisper from someone
+else counts only while your request is open, or from a player you trust. The
+same spot from several players adds up its count, so the busy veins stand out.
 Quest watch: the tracked quests are a plain text list under the minimap as in
 2006, yellow titles with their objectives below, finished objectives greyed.
 They are grouped under their quest-log zone headers, and each zone folds with
