@@ -425,7 +425,7 @@ local function createChrome(window)
 end
 
 -- one baked cell per column and row, borders left and right of every row
-local function layoutChrome(window, columns, rows)
+local function layoutChrome(window, columns, rows, slots)
     local chrome = window.chrome
     local width = EDGE_LEFT + columns * CELL + EDGE_RIGHT
     local y = -TOP_BAND
@@ -445,7 +445,12 @@ local function layoutChrome(window, columns, rows)
         pieces.right:SetSize(EDGE_RIGHT, CELL)
         pieces.right:SetPoint("TOPRIGHT", window, "TOPRIGHT", 0, y)
         pieces.right:Show()
-        for column = 1, columns do
+        -- the last row carries cells only for real slots; leather fills the rest
+        local cellsInRow = columns
+        if row == rows and slots and slots > 0 then
+            cellsInRow = slots - (rows - 1) * columns
+        end
+        for column = 1, cellsInRow do
             local cell = pieces.cells[column]
             if not cell then
                 cell = chromeTexture(window)
@@ -457,8 +462,20 @@ local function layoutChrome(window, columns, rows)
             cell:SetPoint("TOPLEFT", window, "TOPLEFT", EDGE_LEFT + (column - 1) * CELL, y)
             cell:Show()
         end
-        for column = columns + 1, #pieces.cells do
+        for column = cellsInRow + 1, #pieces.cells do
             pieces.cells[column]:Hide()
+        end
+        if not pieces.fill then
+            pieces.fill = chromeTexture(window)
+            coords(pieces.fill, 122, 218, LEATHER_V0, LEATHER_V1)
+        end
+        if cellsInRow < columns then
+            pieces.fill:SetSize((columns - cellsInRow) * CELL, CELL)
+            pieces.fill:ClearAllPoints()
+            pieces.fill:SetPoint("TOPLEFT", window, "TOPLEFT", EDGE_LEFT + cellsInRow * CELL, y)
+            pieces.fill:Show()
+        else
+            pieces.fill:Hide()
         end
         y = y - CELL
     end
@@ -466,6 +483,9 @@ local function layoutChrome(window, columns, rows)
         local pieces = chrome.rows[row]
         pieces.left:Hide()
         pieces.right:Hide()
+        if pieces.fill then
+            pieces.fill:Hide()
+        end
         for _, cell in ipairs(pieces.cells) do
             cell:Hide()
         end
@@ -939,7 +959,7 @@ function Bags.RefreshWindow(kind, relayout)
     local rows = math.max(1, math.ceil(index / columns))
     local width, height
     if window.chrome then
-        width, height = layoutChrome(window, columns, rows)
+        width, height = layoutChrome(window, columns, rows, index)
     else
         width = PADDING * 2 + columns * stride - SPACING
         height = HEADER + rows * stride - SPACING + FOOTER + PADDING
