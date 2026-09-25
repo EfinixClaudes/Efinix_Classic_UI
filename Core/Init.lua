@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-25.69" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-25.70" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -445,6 +445,12 @@ SlashCmdList.FCUI = function(input)
             ns.Print("dark mode %s", rest)
         else
             ns.Print("usage: /fcui dark on|off (currently %s)", ns.Dark.Enabled() and "on" or "off")
+        end
+    elseif cmd == "quests" then
+        if ns.QuestAuto and (rest == "grey on" or rest == "grey off") then
+            ns.QuestAuto.SetTrivial(rest == "grey on")
+        else
+            ns.Print("usage: /fcui quests grey on|off (take grey quests automatically too)")
         end
     elseif cmd == "gather" then
         if ns.Gather then

@@ -25,6 +25,7 @@ local DEFAULTS = {
         SpellBook = true,
         Talents = true,
         QuestWatch = true,
+        QuestAuto = true,
         Gather = true,
         Bags = true,
         Vendor = true,

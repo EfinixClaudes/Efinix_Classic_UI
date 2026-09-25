@@ -27,6 +27,7 @@ local MODULES = {
     { key = "Talents", label = "Talent window" },
     { key = "QuestWatch", label = "Quest watch list (zones fold, replaces the objective tracker)" },
     { key = "Gather", label = "Record mining and herb nodes on the map" },
+    { key = "QuestAuto", label = "Accept and hand in quests on interact (hold Shift to pause)" },
     { key = "Bags", label = "Bag window (all bags in one)" },
     { key = "Vendor", label = "Vendor: sell junk and repair while holding Shift" },
 }

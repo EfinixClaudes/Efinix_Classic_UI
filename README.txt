@@ -138,6 +138,13 @@ holder sends you at most once in twelve hours, so nobody floods the guild.
 for party and raid. Spots from guild, party and raid members are taken as they
 arrive; a whisper from someone else counts only while your request is open, or
 from a player you trust. A spot several players know keeps the highest count.
+Quests on interact: talking to a quest giver (the Interact with Target key or a
+right-click) answers the quest dialogs by itself: finished quests are handed in,
+new ones accepted, and the reward taken when there is only one. Spamming the
+interact key therefore takes and turns in everything the NPC offers. It stops
+and lets you decide when there are several rewards to choose from, when a
+hand-in costs gold, for PvP quests and for grey quests ("/fcui quests grey on"
+takes those too). Hold Shift while talking to the NPC to do it by hand.
 Quest watch: the tracked quests are a plain text list under the minimap as in
 2006, yellow titles with their objectives below, finished objectives greyed.
 They are grouped under their quest-log zone headers, and each zone folds with
