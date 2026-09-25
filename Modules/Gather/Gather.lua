@@ -156,27 +156,31 @@ end
 ---------------------------------------------------------------------------
 -- Storage
 ---------------------------------------------------------------------------
+local decodeNode, merge, save -- defined below
+
+-- All stored copies are merged (see DB.GetBlobSources); if the merge found
+-- more than any single copy held, the merged list is written back at once.
 local function load()
     if loaded then
         return
     end
     loaded = true
     nodes = { m = {}, h = {} }
-    local blob = ns.DB.GetBlob(BLOB)
-    if type(blob) ~= "string" then
-        return
-    end
-    for entry in blob:gmatch("[^;]+") do
-        local p, map, x, y, count, name = entry:match("^([mh]),(%d+),(%d+),(%d+),(%d+),(.*)$")
-        if p then
-            nodes[p][#nodes[p] + 1] = {
-                map = tonumber(map),
-                x = tonumber(x) / 10000,
-                y = tonumber(y) / 10000,
-                count = tonumber(count) or 1,
-                name = ns.DB.Unescape(name),
-            }
+    local sources = ns.DB.GetBlobSources(BLOB)
+    local largest = 0
+    for _, blob in ipairs(sources) do
+        local count = 0
+        for entry in blob:gmatch("[^;]+") do
+            local p, node = decodeNode(entry)
+            if p then
+                count = count + 1
+                merge(p, node)
+            end
         end
+        largest = math.max(largest, count)
+    end
+    if #nodes.m + #nodes.h > largest then
+        save()
     end
 end
 
@@ -193,7 +197,7 @@ local function encodeNode(p, node)
 end
 
 -- the icon field is optional (older entries have six fields)
-local function decodeNode(entry)
+decodeNode = function(entry)
     local p, map, x, y, count, name, icon = entry:match("^([mh]),(%d+),(%d+),(%d+),(%d+),([^,]*),?(%d*)$")
     if not p then
         return nil
@@ -209,7 +213,7 @@ local function decodeNode(entry)
         }
 end
 
-local function save()
+save = function()
     local parts = {}
     for p, list in pairs(nodes) do
         for _, node in ipairs(list) do
@@ -222,7 +226,7 @@ end
 -- Merge one received spot into the list: a known spot within MERGE_DISTANCE
 -- keeps the larger count (the same map arriving twice must change nothing),
 -- anything else is new. Returns true when it was new.
-local function merge(p, incoming)
+merge = function(p, incoming)
     local list = nodes[p]
     for _, node in ipairs(list) do
         if

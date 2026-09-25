@@ -295,10 +295,13 @@ function DB.BlobReport()
         local cvarValue = C_CVar and C_CVar.GetCVar and C_CVar.GetCVar(blobCVar(key))
         local char = EfinixClassicUICharSettings
         local saved = type(char) == "table" and char["blob_" .. key]
-        parts[#parts + 1] = ("%s: cvar %s, saved %s"):format(
+        local account = EfinixClassicUIAccountSettings
+        local shared = type(account) == "table" and account["blob_" .. key]
+        parts[#parts + 1] = ("%s: cvar %s, saved %s, account %s"):format(
             key,
             type(cvarValue) == "string" and (#cvarValue .. " chars") or "none",
-            type(saved) == "string" and (#saved .. " chars") or "none"
+            type(saved) == "string" and (#saved .. " chars") or "none",
+            type(shared) == "string" and (#shared .. " chars") or "none"
         )
     end
     return table.concat(parts, "; ")
@@ -318,6 +321,29 @@ function DB.GetBlob(key)
         blobs[key] = type(value) == "string" and value ~= "" and value or false
     end
     return blobs[key] or nil
+end
+
+-- Every copy of a blob that exists: the game setting (lives only while the
+-- client runs, shared by all characters), this character's saved file and
+-- the account-wide saved file. Callers merge them; taking just one lost a
+-- character's data when another character had filled the game setting first.
+function DB.GetBlobSources(key)
+    local list, seen = {}, {}
+    local function add(value)
+        if type(value) == "string" and value ~= "" and not seen[value] then
+            seen[value] = true
+            list[#list + 1] = value
+        end
+    end
+    if C_CVar and C_CVar.GetCVar then
+        registerBlobCVar(key)
+        add(C_CVar.GetCVar(blobCVar(key)))
+    end
+    local char = EfinixClassicUICharSettings
+    add(type(char) == "table" and char["blob_" .. key] or nil)
+    local account = EfinixClassicUIAccountSettings
+    add(type(account) == "table" and account["blob_" .. key] or nil)
+    return list
 end
 
 function DB.SetBlob(key, text)
@@ -373,7 +399,9 @@ function DB.Flush()
     local stamp = { data = data, build = tostring(ns.BUILD), written = date("%H:%M:%S") }
     copyBlobs(EfinixClassicUICharSettings, stamp)
     EfinixClassicUICharSettings = stamp
-    EfinixClassicUIAccountSettings = { data = data, build = stamp.build, written = stamp.written }
+    local account = { data = data, build = stamp.build, written = stamp.written }
+    copyBlobs(EfinixClassicUIAccountSettings, account)
+    EfinixClassicUIAccountSettings = account
     if C_CVar and C_CVar.SetCVar then
         DB.RegisterCVar()
         pcall(C_CVar.SetCVar, CVAR, stamp.written .. "|" .. stamp.build .. "|" .. data)

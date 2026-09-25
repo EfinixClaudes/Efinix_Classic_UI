@@ -171,26 +171,35 @@ local function entryIsMine(entry)
     return entry:sub(1, #key) == key and (separator == "#" or separator == "|")
 end
 
-local function loadBankCache()
-    local blob = ns.DB.GetBlob(BANK_BLOB)
-    if type(blob) ~= "string" then
-        return
+-- Every stored copy is read (see DB.GetBlobSources): per character the
+-- newest snapshot wins, so no copy can overwrite another character's bank.
+local function allSnapshots()
+    local byChar = {}
+    for _, blob in ipairs(ns.DB.GetBlobSources(BANK_BLOB)) do
+        for entry in blob:gmatch("[^&]+") do
+            local key = entry:match("^([^|#]*)[|#]")
+            local seen = tonumber(entry:match("^[^|#]*[|#](%d+)")) or 0
+            if key and (not byChar[key] or byChar[key].seen < seen) then
+                byChar[key] = { seen = seen, entry = entry }
+            end
+        end
     end
-    for entry in blob:gmatch("[^&]+") do
-        if entryIsMine(entry) then
-            bankCache = decodeSnapshot(entry)
+    return byChar
+end
+
+local function loadBankCache()
+    for _, item in pairs(allSnapshots()) do
+        if entryIsMine(item.entry) then
+            bankCache = decodeSnapshot(item.entry)
         end
     end
 end
 
 local function saveBankCache()
     local entries = { encodeSnapshot(bankCache) }
-    local blob = ns.DB.GetBlob(BANK_BLOB)
-    if type(blob) == "string" then
-        for entry in blob:gmatch("[^&]+") do
-            if not entryIsMine(entry) then
-                entries[#entries + 1] = entry
-            end
+    for _, item in pairs(allSnapshots()) do
+        if not entryIsMine(item.entry) then
+            entries[#entries + 1] = item.entry
         end
     end
     ns.DB.SetBlob(BANK_BLOB, table.concat(entries, "&"))
