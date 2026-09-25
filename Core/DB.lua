@@ -342,16 +342,45 @@ function DB.GetBlobSources(key)
     end
     local char = EfinixClassicUICharSettings
     add(type(char) == "table" and char["blob_" .. key] or nil)
+    add(type(char) == "table" and char["blob_" .. key .. "_old"] or nil)
     local account = EfinixClassicUIAccountSettings
     add(type(account) == "table" and account["blob_" .. key] or nil)
     return list
 end
 
+-- Called once the saved files are in place: a blob an older build kept in a
+-- game setting moves into this character's saved file ("blob_<key>_old",
+-- merged by every reader) and the game setting is emptied, so the account
+-- data the client uploads carries no more than the small settings line.
+function DB.MigrateBlobCVars()
+    if not (C_CVar and C_CVar.GetCVar and C_CVar.SetCVar) then
+        return
+    end
+    for _, key in ipairs(BLOB_KEYS) do
+        registerBlobCVar(key)
+        local value = C_CVar.GetCVar(blobCVar(key))
+        if type(value) == "string" and value ~= "" then
+            if type(EfinixClassicUICharSettings) == "table" then
+                EfinixClassicUICharSettings["blob_" .. key .. "_old"] = value
+            end
+            pcall(C_CVar.SetCVar, blobCVar(key), "")
+        end
+    end
+end
+
+-- Blobs live only in the saved files. The client keeps an addon's game
+-- settings in the account data it uploads to the server, and rewriting
+-- kilobytes there on every gather and bag change made those uploads fail
+-- ("Updating account data was not successful", 2026-09-25). A blob found in
+-- a game setting from an older build is read once (GetBlobSources) and then
+-- emptied here, so it leaves the account data.
 function DB.SetBlob(key, text)
     blobs[key] = text
-    if C_CVar and C_CVar.SetCVar then
-        registerBlobCVar(key)
-        pcall(C_CVar.SetCVar, blobCVar(key), text)
+    if C_CVar and C_CVar.GetCVar and C_CVar.SetCVar then
+        local old = C_CVar.GetCVar(blobCVar(key))
+        if type(old) == "string" and old ~= "" then
+            pcall(C_CVar.SetCVar, blobCVar(key), "")
+        end
     end
     DB.Flush()
 end
@@ -403,9 +432,14 @@ function DB.Flush()
     local account = { data = data, build = stamp.build, written = stamp.written }
     copyBlobs(EfinixClassicUIAccountSettings, account)
     EfinixClassicUIAccountSettings = account
-    if C_CVar and C_CVar.SetCVar then
+    -- the settings game setting is only rewritten when the settings changed:
+    -- every write is an account data upload
+    if C_CVar and C_CVar.SetCVar and data ~= DB.lastCVarData then
         DB.RegisterCVar()
-        pcall(C_CVar.SetCVar, CVAR, stamp.written .. "|" .. stamp.build .. "|" .. data)
+        local ok = pcall(C_CVar.SetCVar, CVAR, stamp.written .. "|" .. stamp.build .. "|" .. data)
+        if ok then
+            DB.lastCVarData = data
+        end
     end
     DB.flushed = #data
 end

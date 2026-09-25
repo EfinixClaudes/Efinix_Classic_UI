@@ -3,7 +3,7 @@ local ADDON, ns = ...
 -- Single addon table. Nothing else goes into _G except SavedVariables (see DB.lua)
 -- and the slash command registration at the bottom of this file.
 ns.name = ADDON
-ns.BUILD = "2026-09-25.71" -- bump on every change that is tested in game
+ns.BUILD = "2026-09-25.72" -- bump on every change that is tested in game
 ns.modules = {} -- name -> module table
 ns.moduleOrder = {} -- registration order, also enable order
 ns.L = setmetatable({}, {
@@ -212,6 +212,7 @@ ns.RegisterEvent("ADDON_LOADED", ns, function(_, _, loaded)
     -- ends before PLAYER_LOGIN (quit at the loading screen, a character
     -- switch) otherwise makes the game write the files back as nil.
     ns.DB.Flush()
+    ns.DB.MigrateBlobCVars()
     ns.Assets.Verify()
     ns.loaded = true
 end)
