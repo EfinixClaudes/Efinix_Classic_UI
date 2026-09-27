@@ -587,8 +587,10 @@ local function styleItemButton(button)
             tex:Hide()
         end
     end
-    -- Our frame: dropping the modern empty-slot atlas keeps the classic dark slot
-    button.emptyBackgroundAtlas = nil
+    -- No field of a Blizzard item button is ever written from here: Blizzard's
+    -- click code reads them on the way to C_Container.UseContainerItem, and an
+    -- addon-written value makes the game block using scrolls, potions and the
+    -- like ("blocked from an action only available to the Blizzard UI").
     -- ItemButton intrinsic already uses Quickslot2 / Depress / ButtonHilight-Square
     if button.Cooldown then
         button.Cooldown:SetAllPoints(button)
@@ -605,8 +607,10 @@ local function getItemButton(window, bagID, slot)
     if not button then
         local name = ("FCUI_Bags_%s_%d_%d"):format(window.kind, bagID, slot)
         button = CreateFrame("ItemButton", name, holder, "ContainerFrameItemButtonTemplate")
+        -- the bag number comes from the holder's ID (ContainerFrameItemButtonMixin:
+        -- GetBagID falls back to self:GetParent():GetID()); SetBagID would store it
+        -- on the button from addon code, which taints every use of the item
         button:SetID(slot)
-        button:SetBagID(bagID)
         button:SetSize(SLOT, SLOT)
         styleItemButton(button)
         holder.buttons[slot] = button
@@ -618,6 +622,10 @@ local function updateItemButton(button, bagID, slot)
     local info = C_Container.GetContainerItemInfo(bagID, slot)
     local hasItem = info ~= nil
     SetItemButtonTexture(button, hasItem and info.iconFileID or nil)
+    if not hasItem and button.icon then
+        -- the modern empty-slot atlas: the classic dark slot shows through instead
+        button.icon:SetTexture(nil)
+    end
     SetItemButtonCount(button, hasItem and info.stackCount or 0)
     SetItemButtonDesaturated(button, hasItem and info.isLocked)
     if hasItem and info.quality then
