@@ -107,8 +107,9 @@ smaller. Turning the Nameplates part off (or removing the addon after
 /fcui disable Nameplates) puts your old nameplate settings back.
 Minimap: "Minimap size" in the options scales the whole minimap cluster; the
 buffs move left to make room.
-Raid frames: the modern compact raid frames are hidden. Use the raid tab of the
-social window and drag groups out of it, as in 2006.
+Raid frames: the game's raid frames show in raids as usual; set them up in Edit
+Mode and the game's options. Tick "Hide the game's raid frames" in the options
+only if you want the 2006 way, the raid tab of the social window.
 Spellbook: P (or the spellbook button in the micro menu) opens the old two-page
 book with the skill tabs on the right. Drag spells to your bars as usual. It opens
 and closes in combat too, and Escape closes it. Clicking a spell in the book casts

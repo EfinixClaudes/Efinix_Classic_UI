@@ -21,7 +21,7 @@ local MODULES = {
     { key = "Chat", label = "Chat frame" },
     { key = "Tooltip", label = "Tooltips" },
     { key = "Nameplates", label = "Classic nameplates" },
-    { key = "RaidFrames", label = "Hide the modern raid frames" },
+    { key = "RaidFrames", label = "Hide the game's raid frames (off: they show in raids)" },
     { key = "LootFrame", label = "Loot window" },
     { key = "SpellBook", label = "Spellbook" },
     { key = "Talents", label = "Talent window" },

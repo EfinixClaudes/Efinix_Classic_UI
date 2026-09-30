@@ -4,7 +4,7 @@ local DB = {}
 ns.DB = DB
 
 local DEFAULTS = {
-    version = 4,
+    version = 5,
     scale = 1,
     darkMode = false, -- frame art tinted dark grey (addon option)
     microMenuRow = true, -- all menus in one micro menu row; the bar art grows to fit
@@ -20,7 +20,7 @@ local DEFAULTS = {
         Chat = true,
         Tooltip = true,
         Nameplates = true,
-        RaidFrames = true,
+        RaidFrames = false, -- the game's raid frames stay; hiding them is opt-in
         LootFrame = true,
         SpellBook = true,
         Talents = true,
@@ -76,6 +76,12 @@ local migrations = {
         db.positions = {}
     end,
     -- 4: Nameplates keeps every cvar it changes under nameplates.previous
+    -- 5: the game's raid frames are shown for everyone; hiding them is opt-in now
+    [5] = function(db)
+        if type(db.modules) == "table" then
+            db.modules.RaidFrames = false
+        end
+    end,
     [4] = function(db)
         if type(db.nameplates) == "table" then
             db.nameplates.previous = db.nameplates.previous or {}
