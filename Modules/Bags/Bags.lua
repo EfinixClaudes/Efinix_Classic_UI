@@ -636,6 +636,7 @@ local function styleBlizzardButton(button)
         "BagIndicator",
         "ExtendedSlot",
         "ItemSlotBackground",
+        "ItemContextOverlay",
     }) do
         local region = button[key]
         if region and region.SetAlpha then
@@ -1475,7 +1476,47 @@ function Bags:Refresh()
     Bags.RefreshAll(true)
 end
 
+-- what the first slots of the inventory window are made of, for chasing display problems
+local function describeSlot(button)
+    if not button then
+        return "none"
+    end
+    local icon = button.icon or button.Icon
+    local point, relativeTo = button:GetPoint(1)
+    local overlays = {}
+    for _, key in ipairs({ "searchOverlay", "ItemContextOverlay", "IconOverlay", "ExtendedOverlay" }) do
+        local region = button[key]
+        if region and region.IsShown and region:IsShown() and region:GetAlpha() > 0 then
+            overlays[#overlays + 1] = key
+        end
+    end
+    local pattern = "%s shown=%s visible=%s alpha=%.2f eff=%.2f strata=%s level=%d at %s/%s"
+        .. " icon=%s iconShown=%s iconAlpha=%.2f overlays=[%s]"
+    return pattern:format(
+        tostring(button:GetName() or button:GetDebugName()),
+        tostring(button:IsShown()),
+        tostring(button:IsVisible()),
+        button:GetAlpha(),
+        button:GetEffectiveAlpha(),
+        tostring(button:GetFrameStrata()),
+        button:GetFrameLevel(),
+        tostring(point),
+        tostring(relativeTo and (relativeTo:GetName() or relativeTo:GetDebugName())),
+        tostring(icon and icon:GetTexture()),
+        tostring(icon and icon:IsShown()),
+        icon and icon:GetAlpha() or -1,
+        table.concat(overlays, ",")
+    )
+end
+
 function Bags:Diag()
+    for _, bagID in ipairs({ BACKPACK, 1 }) do
+        for slot = 1, 2 do
+            local info = C_Container.GetContainerItemInfo(bagID, slot)
+            ns.Print("  bag %d slot %d item=%s", bagID, slot, tostring(info and info.hyperlink))
+            ns.Print("    game button: %s", describeSlot(Bags.Blizzard.FindButton(bagID, slot)))
+        end
+    end
     for kind, window in pairs(Bags.windows) do
         local count = 0
         for _, holder in pairs(window.holders) do
