@@ -987,12 +987,18 @@ function Bags.RefreshWindow(kind, relayout)
                 local col = (index - 1) % columns
                 local row = math.floor((index - 1) / columns)
                 local blizzard = kind == "inventory" and Bags.Blizzard.FindButton(bagID, slot)
+                if blizzard and not blizzard:IsVisible() then
+                    blizzard = nil -- never leave a slot empty: the fallback draws it
+                end
                 local own = getItemButton(window, bagID, slot)
                 if blizzard then
                     -- the game's own button: using items from it is never blocked
                     own:Hide()
                     styleBlizzardButton(blizzard)
                     blizzard:SetAlpha(1)
+                    -- drawn above the window's own art, whatever strata its frame has
+                    blizzard:SetFrameStrata(window:GetFrameStrata())
+                    blizzard:SetFrameLevel(window:GetFrameLevel() + 20)
                     blizzard:ClearAllPoints()
                     blizzard:SetPoint("TOPLEFT", window.Items, "TOPLEFT", col * stride, -row * stride)
                     placedBlizzard[blizzard] = true
@@ -1513,8 +1519,20 @@ function Bags:Diag()
     for _, bagID in ipairs({ BACKPACK, 1 }) do
         for slot = 1, 2 do
             local info = C_Container.GetContainerItemInfo(bagID, slot)
-            ns.Print("  bag %d slot %d item=%s", bagID, slot, tostring(info and info.hyperlink))
-            ns.Print("    game button: %s", describeSlot(Bags.Blizzard.FindButton(bagID, slot)))
+            local button = Bags.Blizzard.FindButton(bagID, slot)
+            ns.Print(
+                "  bag %d slot %d: item=%s game button=%s visible=%s strata=%s level=%s",
+                bagID,
+                slot,
+                tostring(info and info.itemID),
+                tostring(button ~= nil),
+                tostring(button and button:IsVisible()),
+                tostring(button and button:GetFrameStrata()),
+                tostring(button and button:GetFrameLevel())
+            )
+            if button then
+                ns.Print("    %s", describeSlot(button))
+            end
         end
     end
     for kind, window in pairs(Bags.windows) do
