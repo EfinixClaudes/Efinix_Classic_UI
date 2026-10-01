@@ -991,6 +991,7 @@ function Bags.RefreshWindow(kind, relayout)
                     -- the game's own button: using items from it is never blocked
                     own:Hide()
                     styleBlizzardButton(blizzard)
+                    blizzard:SetAlpha(1)
                     blizzard:ClearAllPoints()
                     blizzard:SetPoint("TOPLEFT", window.Items, "TOPLEFT", col * stride, -row * stride)
                     placedBlizzard[blizzard] = true

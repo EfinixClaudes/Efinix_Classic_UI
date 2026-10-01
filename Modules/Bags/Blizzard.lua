@@ -43,8 +43,14 @@ local function hideArt(frame)
     for _, region in ipairs({ frame:GetRegions() }) do
         region:SetAlpha(0)
     end
+    -- slot buttons are recognised by membership in the frame's Items list
+    -- (their object type does not say "ItemButton" on this client)
+    local slots = {}
+    for _, button in ipairs(type(frame.Items) == "table" and frame.Items or {}) do
+        slots[button] = true
+    end
     for _, child in ipairs({ frame:GetChildren() }) do
-        if child:GetObjectType() ~= "ItemButton" then
+        if not slots[child] and not child.GetBagID then
             Raw.SetAlpha(child, 0)
         end
     end
