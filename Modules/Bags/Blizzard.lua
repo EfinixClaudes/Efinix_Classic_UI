@@ -32,12 +32,48 @@ local CONTAINER_FRAMES = {
 
 local parked = {} -- frame -> true
 
+-- The container frames' own slot buttons are what the bag window shows: they
+-- are created by Blizzard's code, so using an item from them (scrolls,
+-- recipes, armor kits, potions in combat) is never blocked, which addon-made
+-- copies of the same template could not avoid. So a parked container frame
+-- keeps full size and alpha, sits off screen, and only its own art is made
+-- invisible; Bags.RefreshWindow anchors its slot buttons into our grid.
+-- DIALOG strata keeps those buttons above the HIGH bag window.
+local function hideArt(frame)
+    for _, region in ipairs({ frame:GetRegions() }) do
+        region:SetAlpha(0)
+    end
+    for _, child in ipairs({ frame:GetChildren() }) do
+        if child:GetObjectType() ~= "ItemButton" then
+            Raw.SetAlpha(child, 0)
+        end
+    end
+end
+
 local function park(frame)
-    Raw.SetAlpha(frame, 0)
-    Raw.SetScale(frame, 0.01)
+    Raw.SetAlpha(frame, 1)
+    Raw.SetScale(frame, 1)
+    Raw.SetFrameStrata(frame, "DIALOG")
     Raw.ClearAllPoints(frame)
     Raw.SetPoint(frame, "TOPLEFT", UIParent, "TOPRIGHT", 4000, 4000)
+    hideArt(frame)
     parked[frame] = true
+end
+
+-- The game's own slot button for bag/slot, from whichever container frame
+-- (single bags or the combined bag) currently shows that bag; nil if none.
+function Blizzard.FindButton(bagID, slot)
+    for _, name in ipairs(CONTAINER_FRAMES) do
+        local frame = _G[name]
+        if frame and Raw.IsShown(frame) and type(frame.Items) == "table" then
+            for _, button in ipairs(frame.Items) do
+                if button:GetID() == slot and button.GetBagID and button:GetBagID() == bagID then
+                    return button
+                end
+            end
+        end
+    end
+    return nil
 end
 
 local function unpark(frame)
@@ -109,6 +145,14 @@ function Blizzard.Enable()
                 park(self)
                 syncInventory()
             end)
+            -- Blizzard re-anchors its slot buttons whenever it lays the bag out
+            if type(frame.UpdateItemLayout) == "function" then
+                hooksecurefunc(frame, "UpdateItemLayout", function()
+                    C_Timer.After(0, function()
+                        Bags.RefreshWindow("inventory", true)
+                    end)
+                end)
+            end
             frame:HookScript("OnHide", syncInventory)
         end
     end

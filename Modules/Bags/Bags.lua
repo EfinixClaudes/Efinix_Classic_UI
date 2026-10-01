@@ -618,6 +618,46 @@ local function getItemButton(window, bagID, slot)
     return button
 end
 
+-- The game's slot buttons in our grid (see Blizzard.lua): they are only
+-- ever moved, faded and highlighted with widget methods, never written to.
+local styledBlizzard = setmetatable({}, { __mode = "k" })
+
+local function styleBlizzardButton(button)
+    if styledBlizzard[button] then
+        return
+    end
+    styledBlizzard[button] = true
+    for _, key in ipairs({
+        "NewItemTexture",
+        "BattlepayItemTexture",
+        "JunkIcon",
+        "UpgradeIcon",
+        "flash",
+        "BagIndicator",
+        "ExtendedSlot",
+        "ItemSlotBackground",
+    }) do
+        local region = button[key]
+        if region and region.SetAlpha then
+            region:SetAlpha(0)
+        end
+    end
+end
+
+-- Puts a game slot button back on its own (off-screen) container frame.
+local function releaseBlizzardButton(button)
+    button:ClearAllPoints()
+    button:SetPoint("TOPLEFT", button:GetParent(), "TOPLEFT", 0, 0)
+end
+
+function Bags.ReleaseBlizzardButtons(window)
+    for _, button in ipairs(window.blizzard or {}) do
+        releaseBlizzardButton(button)
+    end
+    window.blizzard = {}
+    window.blizzardByBag = {}
+end
+
 local function updateItemButton(button, bagID, slot)
     local info = C_Container.GetContainerItemInfo(bagID, slot)
     local hasItem = info ~= nil
@@ -913,6 +953,9 @@ function Bags.RefreshWindow(kind, relayout)
     local seen = {}
     local offlineUsed = 0
     local search = offline and window.Search and window.Search:GetText():lower() or ""
+    local previousBlizzard = window.blizzard or {}
+    window.blizzard, window.blizzardByBag = {}, {}
+    local placedBlizzard = {}
     for _, bagID in ipairs(bagIDs) do
         seen[bagID] = true
         local tab = offline and cachedTab(bagID) or nil
@@ -939,14 +982,28 @@ function Bags.RefreshWindow(kind, relayout)
             end
         else
             for slot = 1, numSlots do
-                local button = getItemButton(window, bagID, slot)
                 index = index + 1
                 local col = (index - 1) % columns
                 local row = math.floor((index - 1) / columns)
-                button:ClearAllPoints()
-                button:SetPoint("TOPLEFT", window.Items, "TOPLEFT", col * stride, -row * stride)
-                button:Show()
-                updateItemButton(button, bagID, slot)
+                local blizzard = kind == "inventory" and Bags.Blizzard.FindButton(bagID, slot)
+                local own = getItemButton(window, bagID, slot)
+                if blizzard then
+                    -- the game's own button: using items from it is never blocked
+                    own:Hide()
+                    styleBlizzardButton(blizzard)
+                    blizzard:ClearAllPoints()
+                    blizzard:SetPoint("TOPLEFT", window.Items, "TOPLEFT", col * stride, -row * stride)
+                    placedBlizzard[blizzard] = true
+                    window.blizzard[#window.blizzard + 1] = blizzard
+                    window.blizzardByBag[bagID] = window.blizzardByBag[bagID] or {}
+                    table.insert(window.blizzardByBag[bagID], blizzard)
+                else
+                    -- fallback for a bag the game has not opened (or the bank)
+                    own:ClearAllPoints()
+                    own:SetPoint("TOPLEFT", window.Items, "TOPLEFT", col * stride, -row * stride)
+                    own:Show()
+                    updateItemButton(own, bagID, slot)
+                end
             end
             holder = window.holders[bagID]
             for slot = numSlots + 1, #holder.buttons do
@@ -958,6 +1015,12 @@ function Bags.RefreshWindow(kind, relayout)
     for bagID, holder in pairs(window.holders) do
         if not seen[bagID] then
             holder:Hide()
+        end
+    end
+    -- game buttons no longer in the grid (hidden bag, smaller bag) go back off screen
+    for _, button in ipairs(previousBlizzard) do
+        if not placedBlizzard[button] then
+            releaseBlizzardButton(button)
         end
     end
     for i = offlineUsed + 1, #window.offline do
@@ -1004,6 +1067,13 @@ end
 -- like the mouse-over glow Vanilla slots had.
 function Bags.HighlightBag(kind, bagID, on)
     local window = Bags.windows[kind]
+    for _, button in ipairs(window and window.blizzardByBag and window.blizzardByBag[bagID] or {}) do
+        if on then
+            button:LockHighlight()
+        else
+            button:UnlockHighlight()
+        end
+    end
     local holder = window and window.holders[bagID]
     if not holder or not holder:IsShown() then
         return
@@ -1119,6 +1189,7 @@ local function createWindow(kind, title)
         end
     end)
     window:SetScript("OnHide", function(self)
+        Bags.ReleaseBlizzardButtons(self)
         if self.Search and self.Search:GetText() ~= "" then
             self.Search:SetText("")
         end
