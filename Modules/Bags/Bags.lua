@@ -622,11 +622,27 @@ end
 -- ever moved, faded and highlighted with widget methods, never written to.
 local styledBlizzard = setmetatable({}, { __mode = "k" })
 
-local function styleBlizzardButton(button)
+-- the invisible game button passes hover to the visible slot under it
+local underneath = setmetatable({}, { __mode = "k" }) -- game button -> our slot
+
+local function styleBlizzardButton(button, own)
+    underneath[button] = own
     if styledBlizzard[button] then
         return
     end
     styledBlizzard[button] = true
+    button:HookScript("OnEnter", function(self)
+        local slot = underneath[self]
+        if slot then
+            slot:LockHighlight()
+        end
+    end)
+    button:HookScript("OnLeave", function(self)
+        local slot = underneath[self]
+        if slot then
+            slot:UnlockHighlight()
+        end
+    end)
     for _, key in ipairs({
         "NewItemTexture",
         "BattlepayItemTexture",
@@ -986,31 +1002,26 @@ function Bags.RefreshWindow(kind, relayout)
                 index = index + 1
                 local col = (index - 1) % columns
                 local row = math.floor((index - 1) / columns)
-                local blizzard = kind == "inventory" and Bags.Blizzard.FindButton(bagID, slot)
-                if blizzard and not blizzard:IsVisible() then
-                    blizzard = nil -- never leave a slot empty: the fallback draws it
-                end
+                -- The addon's own slot always draws the item. The game's own slot
+                -- button, when the game has it, lies on top of it invisibly in DIALOG
+                -- strata (no window can cover it) and takes the clicks: items used
+                -- through it are never blocked.
                 local own = getItemButton(window, bagID, slot)
+                own:ClearAllPoints()
+                own:SetPoint("TOPLEFT", window.Items, "TOPLEFT", col * stride, -row * stride)
+                own:Show()
+                updateItemButton(own, bagID, slot)
+                local blizzard = kind == "inventory" and Bags.Blizzard.FindButton(bagID, slot)
                 if blizzard then
-                    -- the game's own button: using items from it is never blocked
-                    own:Hide()
-                    styleBlizzardButton(blizzard)
-                    blizzard:SetAlpha(1)
-                    -- drawn above the window's own art, whatever strata its frame has
-                    blizzard:SetFrameStrata(window:GetFrameStrata())
-                    blizzard:SetFrameLevel(window:GetFrameLevel() + 20)
+                    styleBlizzardButton(blizzard, own)
+                    blizzard:SetAlpha(0)
+                    blizzard:SetFrameStrata("DIALOG")
                     blizzard:ClearAllPoints()
-                    blizzard:SetPoint("TOPLEFT", window.Items, "TOPLEFT", col * stride, -row * stride)
+                    blizzard:SetAllPoints(own)
                     placedBlizzard[blizzard] = true
                     window.blizzard[#window.blizzard + 1] = blizzard
                     window.blizzardByBag[bagID] = window.blizzardByBag[bagID] or {}
                     table.insert(window.blizzardByBag[bagID], blizzard)
-                else
-                    -- fallback for a bag the game has not opened (or the bank)
-                    own:ClearAllPoints()
-                    own:SetPoint("TOPLEFT", window.Items, "TOPLEFT", col * stride, -row * stride)
-                    own:Show()
-                    updateItemButton(own, bagID, slot)
                 end
             end
             holder = window.holders[bagID]
@@ -1075,13 +1086,6 @@ end
 -- like the mouse-over glow Vanilla slots had.
 function Bags.HighlightBag(kind, bagID, on)
     local window = Bags.windows[kind]
-    for _, button in ipairs(window and window.blizzardByBag and window.blizzardByBag[bagID] or {}) do
-        if on then
-            button:LockHighlight()
-        else
-            button:UnlockHighlight()
-        end
-    end
     local holder = window and window.holders[bagID]
     if not holder or not holder:IsShown() then
         return
