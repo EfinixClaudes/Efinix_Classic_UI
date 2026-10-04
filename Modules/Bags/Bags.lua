@@ -1199,6 +1199,9 @@ local function createWindow(kind, title)
         if self.Money then
             MoneyFrame_UpdateMoney(self.Money)
         end
+        if self.tokens then
+            Bags.UpdateTokens()
+        end
     end)
     window:SetScript("OnHide", function(self)
         Bags.ReleaseBlizzardButtons(self)
@@ -1311,6 +1314,12 @@ local function createWindow(kind, title)
         end)
     end
 
+    -- Currencies marked "Show on backpack": the game draws them in its own
+    -- backpack window, which this window replaces (BackpackTokenFrame)
+    if kind == "inventory" then
+        window.tokens = {}
+    end
+
     -- Money
     window.Money = CreateFrame("Frame", "FCUI_Bags_" .. kind .. "_Money", window, "SmallMoneyFrameTemplate")
     if window.chrome then
@@ -1342,6 +1351,79 @@ function Bags.Hide(kind)
     local window = Bags.windows[kind]
     if window and window:IsShown() then
         window:Hide()
+    end
+end
+
+---------------------------------------------------------------------------
+-- Backpack currencies (BackpackTokenFrameMixin:Update): icon and count per
+-- watched currency, right-aligned in the bag icon strip left of the close
+-- button, with the game's own tooltip.
+---------------------------------------------------------------------------
+local MAX_TOKENS = 5
+local TOKEN_WIDTH = 50
+
+local function getToken(window, index)
+    local token = window.tokens[index]
+    if token then
+        return token
+    end
+    token = CreateFrame("Frame", nil, window)
+    token:SetSize(TOKEN_WIDTH, 16)
+    token:EnableMouse(true)
+    token.Icon = token:CreateTexture(nil, "ARTWORK")
+    token.Icon:SetSize(14, 14)
+    token.Icon:SetPoint("RIGHT", token, "RIGHT", 0, 0)
+    token.Count = token:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    token.Count:SetPoint("RIGHT", token.Icon, "LEFT", -2, 0)
+    token.Count:SetJustifyH("RIGHT")
+    token:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if not pcall(GameTooltip.SetBackpackToken, GameTooltip, self.index) then
+            GameTooltip:SetText(self.name or "", 1, 1, 1)
+        end
+        GameTooltip:Show()
+    end)
+    token:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    window.tokens[index] = token
+    return token
+end
+
+function Bags.UpdateTokens()
+    local window = Bags.windows.inventory
+    if not window or not window.tokens or not C_CurrencyInfo or not C_CurrencyInfo.GetBackpackCurrencyInfo then
+        return
+    end
+    local shown = 0
+    local previous
+    for index = 1, MAX_TOKENS do
+        local info = C_CurrencyInfo.GetBackpackCurrencyInfo(index)
+        if info then
+            shown = shown + 1
+            local token = getToken(window, shown)
+            token.index = index
+            token.name = info.name
+            token.Icon:SetTexture(info.iconFileID)
+            local quantity = info.quantity
+            local text = BreakUpLargeNumbers and BreakUpLargeNumbers(quantity) or tostring(quantity)
+            if #text > 5 and AbbreviateNumbers then
+                text = AbbreviateNumbers(quantity)
+            end
+            token.Count:SetText(text)
+            token:SetWidth(math.max(TOKEN_WIDTH, token.Count:GetStringWidth() + 20))
+            token:ClearAllPoints()
+            if previous then
+                token:SetPoint("RIGHT", previous, "LEFT", -6, 0)
+            else
+                token:SetPoint("TOPRIGHT", window, "TOPRIGHT", -40, -10)
+            end
+            token:Show()
+            previous = token
+        end
+    end
+    for index = shown + 1, #window.tokens do
+        window.tokens[index]:Hide()
     end
 end
 
@@ -1469,6 +1551,19 @@ function Bags:Enable()
         bankOpen = false
         Bags.RefreshWindow("bank", true)
     end)
+    ns.RegisterEvent("CURRENCY_DISPLAY_UPDATE", self, Bags.UpdateTokens)
+    if C_CurrencyInfo and C_CurrencyInfo.SetCurrencyBackpack and not Bags.tokenHooked then
+        -- ticking "Show on backpack" in the currency tab
+        Bags.tokenHooked = true
+        hooksecurefunc(C_CurrencyInfo, "SetCurrencyBackpack", function()
+            C_Timer.After(0, Bags.UpdateTokens)
+        end)
+        if C_CurrencyInfo.SetCurrencyBackpackByID then
+            hooksecurefunc(C_CurrencyInfo, "SetCurrencyBackpackByID", function()
+                C_Timer.After(0, Bags.UpdateTokens)
+            end)
+        end
+    end
     ns.RegisterEvent("PLAYER_ENTERING_WORLD", self, function()
         Bags.RefreshAll(true)
     end)
