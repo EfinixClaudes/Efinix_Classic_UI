@@ -2,7 +2,7 @@
 ## Title: Efinix Classic UI
 ## Notes: Restores the original 2004-2006 Vanilla interface on World of Warcraft: Forever.
 ## Author: Sebi
-## Version: @project-version@
+## Version: main
 ## SavedVariables: EfinixClassicUIAccountSettings
 ## SavedVariablesPerCharacter: EfinixClassicUICharSettings
 ## IconTexture: Interface\Icons\INV_Misc_Book_09

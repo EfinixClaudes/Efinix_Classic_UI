@@ -18,14 +18,21 @@ you like, and an optional dark mode for all the frame art.
 INSTALL
 -------
 
-1. Download the newest zip from the "Releases" page (right side of the GitHub page).
-   Do not use the green "Code" button, that download has the wrong folder name.
-2. Unzip it. You get one folder called "Efinix_Classic_UI".
-3. Move that folder into
+1. On the GitHub page, click the green "Code" button and choose "Download ZIP".
+2. Unzip it. You get one folder called "Efinix_Classic_UI-main".
+3. Rename that folder to "Efinix_Classic_UI" (remove "-main"). The game only
+   loads the addon when the folder has exactly this name.
+4. Move the folder into
    World of Warcraft\_classic_beta_\Interface\AddOns\
-   (or _classic_ once Forever has launched).
-4. Start the game and enable "Efinix Classic UI" in the AddOns list at the
+   (or _classic_ once Forever has launched). Inside it you should see the file
+   "Efinix_Classic_UI.toc" directly, not another folder.
+5. Start the game and enable "Efinix Classic UI" in the AddOns list at the
    character screen. If it is marked as out of date, tick "Load out of date AddOns".
+
+UPDATING: download the ZIP again the same way, delete the old
+"Efinix_Classic_UI" folder in AddOns, and put the new one in its place (renamed
+the same way). Your settings are kept, they are stored by the game, not in the
+addon folder.
 
 
 COMMANDS  (type them in the chat box)
