@@ -131,6 +131,13 @@ left of the map, "Mining" and "Herbs", show or hide them. Nobody has recorded
 Forever's node spawns yet, so the map fills in as you play; after a few laps of
 a zone the route through its nodes is on the map. Hover a pin for the node's
 name and how often you gathered it there.
+Quests on the map: Forever's map has no markers for the old quests, so the addon
+remembers every quest a quest giver offers you, with its level and where the giver
+stands. The M map shows a yellow "!" on each known giver whose quests suit you:
+not done yet, not in your log, not grey and at most three levels above you.
+Hover it for the quest names, coloured by difficulty. The "Quests" checkbox at the
+bottom left of the map turns them on or off. The map fills in as you and your
+guild play: quest givers are shared together with the gathering spots.
 Players who run the addon pool their spots by themselves: about twenty seconds
 after you log in, the addon asks the guild who holds spots, everyone with the
 addon answers, and your map takes the whole map of the two largest holders. A

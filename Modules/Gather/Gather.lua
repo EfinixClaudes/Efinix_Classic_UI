@@ -30,7 +30,15 @@ local ICONS = {
     m = "Interface\\Icons\\Trade_Mining",
     h = "Interface\\Icons\\Trade_Herbalism",
 }
-local LABELS = { m = "Mining", h = "Herbs" }
+local LABELS = { m = "Mining", h = "Herbs", q = "Quests" }
+
+-- Quest givers ("q" spots): Forever's world map has no quest data for the
+-- Vanilla quests (C_QuestLine.GetAvailableQuestLines is empty), so every
+-- quest a giver offers is recorded with its level and the giver's spot, and
+-- shared with the guild like the gathering spots. The name field carries
+-- "questID|level|title|giver"; level 0 means unknown.
+local QUEST_PIN_SIZE = 16
+local QUEST_LEVELS_ABOVE = 3 -- 1.12 shows quests up to a few levels above you as available
 
 -- Per-node icons: the icon of the item the node yields. The client's item
 -- cache is asked first (an ore or herb you have gathered is cached), these
@@ -134,7 +142,7 @@ local HERB_SPELLS = {
 local MINING_NAMES = { ["Mining"] = true }
 local HERB_NAMES = { ["Herb Gathering"] = true, ["Herbalism"] = true }
 
-local nodes = { m = {}, h = {} } -- profession -> list of { map, x, y, count, name }
+local nodes = { m = {}, h = {}, q = {} } -- profession -> list of { map, x, y, count, name }
 local pending -- { profession, name, castGUID } from UNIT_SPELLCAST_SENT
 local overlay
 local pins = {}
@@ -165,7 +173,7 @@ local function load()
         return
     end
     loaded = true
-    nodes = { m = {}, h = {} }
+    nodes = { m = {}, h = {}, q = {} }
     local sources = ns.DB.GetBlobSources(BLOB)
     local largest = 0
     for _, blob in ipairs(sources) do
@@ -179,7 +187,7 @@ local function load()
         end
         largest = math.max(largest, count)
     end
-    if #nodes.m + #nodes.h > largest then
+    if #nodes.m + #nodes.h + #nodes.q > largest then
         save()
     end
 end
@@ -198,7 +206,7 @@ end
 
 -- the icon field is optional (older entries have six fields)
 decodeNode = function(entry)
-    local p, map, x, y, count, name, icon = entry:match("^([mh]),(%d+),(%d+),(%d+),(%d+),([^,]*),?(%d*)$")
+    local p, map, x, y, count, name, icon = entry:match("^([mhq]),(%d+),(%d+),(%d+),(%d+),([^,]*),?(%d*)$")
     if not p then
         return nil
     end
@@ -230,7 +238,8 @@ merge = function(p, incoming)
     local list = nodes[p]
     for _, node in ipairs(list) do
         if
-            node.map == incoming.map
+            (p ~= "q" or node.name == incoming.name)
+            and node.map == incoming.map
             and math.abs(node.x - incoming.x) < MERGE_DISTANCE
             and math.abs(node.y - incoming.y) < MERGE_DISTANCE
         then
@@ -392,6 +401,20 @@ local function getPin(index)
     pin.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     pin:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if self.quests then
+            GameTooltip:SetText(self.giver ~= "" and self.giver or "Quest giver", 1, 1, 1)
+            for _, quest in ipairs(self.quests) do
+                local color = GetQuestDifficultyColor and quest.level > 0 and GetQuestDifficultyColor(quest.level)
+                local label = quest.level > 0 and ("[%d] %s"):format(quest.level, quest.title) or quest.title
+                if color then
+                    GameTooltip:AddLine(label, color.r, color.g, color.b)
+                else
+                    GameTooltip:AddLine(label, 1, 0.82, 0)
+                end
+            end
+            GameTooltip:Show()
+            return
+        end
         GameTooltip:SetText(self.node.name ~= "" and self.node.name or LABELS[self.profession], 1, 1, 1)
         GameTooltip:AddLine(
             ("%s, gathered %d time%s here"):format(
@@ -492,6 +515,9 @@ function Gather.RefreshMap()
                     local pin = getPin(used)
                     pin.node = node
                     pin.profession = profession
+                    pin.quests = nil
+                    pin:SetSize(PIN_SIZE, PIN_SIZE)
+                    pin.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
                     local icon = node.icon or iconFor(profession, node.name)
                     if type(icon) == "number" and not node.icon then
                         node.icon = icon -- learned from the cache; saved with the next change
@@ -512,6 +538,9 @@ function Gather.RefreshMap()
             end
         end
     end
+    if shown.showQuests ~= false then
+        used = Gather.PlaceQuestPins(mapID, used)
+    end
     for index = used + 1, #pins do
         pins[index]:Hide()
     end
@@ -522,6 +551,130 @@ function Gather.RefreshMap()
         child:GetHeight(),
         1 / pinScale()
     )
+end
+
+-- the quest spots worth a "!" for this character: not done, not in the log,
+-- not grey, at most a few levels above; unknown levels always count
+local function questFields(node)
+    local id, level, title, giver = (node.name or ""):match("^(%d+)|(%d*)|([^|]*)|?(.*)$")
+    return tonumber(id), tonumber(level) or 0, title or "?", giver or ""
+end
+
+local function questWanted(questID, level)
+    if not questID then
+        return false
+    end
+    if C_QuestLog.IsQuestFlaggedCompleted and C_QuestLog.IsQuestFlaggedCompleted(questID) then
+        return false
+    end
+    if C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetLogIndexForQuestID(questID) then
+        return false
+    end
+    if level > 0 then
+        local playerLevel = UnitLevel("player") or 1
+        local trivial = UnitQuestTrivialLevelRange and UnitQuestTrivialLevelRange("player") or 8
+        if level > playerLevel + QUEST_LEVELS_ABOVE or playerLevel - level > trivial then
+            return false
+        end
+    end
+    return true
+end
+
+-- one "!" per giver: quests recorded at the same spot share a pin
+function Gather.PlaceQuestPins(mapID, used)
+    local buckets, order = {}, {}
+    for _, node in ipairs(nodes.q) do
+        local questID, level, title, giver = questFields(node)
+        if questWanted(questID, level) then
+            local x, y = positionOn(node, mapID)
+            if x then
+                local key = math.floor(x / MERGE_DISTANCE + 0.5) .. ":" .. math.floor(y / MERGE_DISTANCE + 0.5)
+                local bucket = buckets[key]
+                if not bucket then
+                    bucket = { x = x, y = y, giver = giver, quests = {} }
+                    buckets[key] = bucket
+                    order[#order + 1] = bucket
+                end
+                table.insert(bucket.quests, { level = level, title = title })
+            end
+        end
+    end
+    for _, bucket in ipairs(order) do
+        table.sort(bucket.quests, function(a, b)
+            return a.level < b.level
+        end)
+        used = used + 1
+        local pin = getPin(used)
+        pin.node = nil
+        pin.profession = "q"
+        pin.quests = bucket.quests
+        pin.giver = bucket.giver
+        pin:SetSize(QUEST_PIN_SIZE, QUEST_PIN_SIZE)
+        local ok = pcall(pin.Icon.SetAtlas, pin.Icon, "QuestNormal")
+        if not ok or not pin.Icon:GetAtlas() then
+            pin.Icon:SetColorTexture(1, 0.82, 0, 1)
+        end
+        placePin(pin, bucket.x, bucket.y)
+        pin:SetFrameLevel(pinLevel() + 1)
+        pin:Show()
+    end
+    return used
+end
+
+---------------------------------------------------------------------------
+-- Recording quest givers: every quest a giver offers, with its level when
+-- the game tells it, at the player's spot (you stand next to the giver)
+---------------------------------------------------------------------------
+local function recordQuest(questID, level, title)
+    if not questID or questID == 0 then
+        return
+    end
+    load()
+    local mapID, x, y = playerPosition()
+    if not mapID then
+        return
+    end
+    local giver = UnitName("questnpc") or UnitName("npc") or ""
+    local name = ("%d|%d|%s|%s"):format(questID, tonumber(level) or 0, title or "", giver)
+    -- a later visit can supply a level an earlier record lacked
+    for _, node in ipairs(nodes.q) do
+        local id, known = questFields(node)
+        if id == questID and node.map == mapID then
+            if known == 0 and (tonumber(level) or 0) > 0 then
+                node.name = name
+                save()
+            end
+            return
+        end
+    end
+    if merge("q", { map = mapID, x = x, y = y, count = 1, name = name }) then
+        save()
+        Gather.RefreshMap()
+    end
+end
+
+local function onQuestGossip()
+    if not C_GossipInfo or not C_GossipInfo.GetAvailableQuests then
+        return
+    end
+    for _, quest in ipairs(C_GossipInfo.GetAvailableQuests() or {}) do
+        recordQuest(quest.questID, plain(quest.questLevel), quest.title)
+    end
+end
+
+local function onQuestGreeting()
+    for i = 1, (GetNumAvailableQuests and GetNumAvailableQuests() or 0) do
+        local questID = select(5, GetAvailableQuestInfo(i))
+        local level = GetAvailableLevel and GetAvailableLevel(i) or 0
+        recordQuest(questID, level, GetAvailableTitle and GetAvailableTitle(i))
+    end
+end
+
+local function onQuestDetail()
+    local questID = GetQuestID and GetQuestID()
+    if questID and questID > 0 then
+        recordQuest(questID, 0, GetTitleText and GetTitleText())
+    end
 end
 
 local function rescale()
@@ -567,6 +720,7 @@ attachToMap = function()
     overlay:SetFrameLevel(pinLevel())
     createCheck("showMining", "Mining", 12)
     createCheck("showHerbs", "Herbs", 84)
+    createCheck("showQuests", "Quests", 150)
     if WorldMapFrame.OnMapChanged then
         hooksecurefunc(WorldMapFrame, "OnMapChanged", Gather.RefreshMap)
     end
@@ -576,6 +730,7 @@ attachToMap = function()
     WorldMapFrame:HookScript("OnShow", function()
         checks.showMining:SetChecked(settings().showMining ~= false)
         checks.showHerbs:SetChecked(settings().showHerbs ~= false)
+        checks.showQuests:SetChecked(settings().showQuests ~= false)
         Gather.RefreshMap()
     end)
 end
@@ -679,7 +834,7 @@ local function channelFor(word)
 end
 
 local function totalSpots()
-    return #nodes.m + #nodes.h
+    return #nodes.m + #nodes.h + #nodes.q
 end
 
 -- after the hello wait: pull the whole map from the largest holders
@@ -914,7 +1069,7 @@ function Gather.Command(rest)
     end
     if rest == "clear" or rest == "clear mining" or rest == "clear herbs" then
         if rest == "clear" then
-            nodes = { m = {}, h = {} }
+            nodes = { m = {}, h = {}, q = {} }
         else
             nodes[rest == "clear mining" and "m" or "h"] = {}
         end
@@ -952,6 +1107,15 @@ function Gather:Enable()
     load()
     ns.RegisterEvent("UNIT_SPELLCAST_SENT", self, onSent)
     ns.RegisterEvent("UNIT_SPELLCAST_SUCCEEDED", self, onSucceeded)
+    ns.RegisterEvent("GOSSIP_SHOW", self, onQuestGossip)
+    ns.RegisterEvent("QUEST_GREETING", self, onQuestGreeting)
+    ns.RegisterEvent("QUEST_DETAIL", self, onQuestDetail)
+    -- the "!" disappear as quests are taken and done, and change with your level
+    for _, event in ipairs({ "QUEST_ACCEPTED", "QUEST_TURNED_IN", "PLAYER_LEVEL_UP" }) do
+        ns.RegisterEvent(event, self, function()
+            C_Timer.After(0.5, Gather.RefreshMap)
+        end)
+    end
     if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
         pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX)
         ns.RegisterEvent("CHAT_MSG_ADDON", self, onAddonMessage)
