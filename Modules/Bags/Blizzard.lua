@@ -142,7 +142,39 @@ end
 ---------------------------------------------------------------------------
 -- Enable
 ---------------------------------------------------------------------------
+-- The game's "combined bags" mode puts every slot of the backpack and bags
+-- 1-4 into one game window (ContainerFrameCombinedBags), opened by the bag
+-- key. In the default one-window-per-bag mode the bag key opens only the
+-- backpack, so the other bags had no game slot buttons and their items went
+-- through the addon's own slots, where using them is blocked. The setting is
+-- switched once and remembered for Disable; the game reads it from its own
+-- code at the next login or reload (VARIABLES_LOADED), which is when item use
+-- from every bag becomes unblocked.
+local function useCombinedBags()
+    if not (C_CVar and C_CVar.GetCVar and C_CVar.SetCVar) then
+        return
+    end
+    local current = C_CVar.GetCVar("combinedBags")
+    if current == nil or current == "1" then
+        return
+    end
+    ns.db.bags.previousCombined = current
+    C_CVar.SetCVar("combinedBags", "1")
+    ns.DB.Flush()
+    ns.Print("bags: switched the game to combined bags so items in every bag can be used; please /reload once")
+end
+
+function Blizzard.RestoreBagSetting()
+    local previous = ns.db.bags.previousCombined
+    if previous and C_CVar and C_CVar.SetCVar then
+        C_CVar.SetCVar("combinedBags", previous)
+        ns.db.bags.previousCombined = nil
+        ns.DB.Flush()
+    end
+end
+
 function Blizzard.Enable()
+    useCombinedBags()
     parkContainers()
     for _, name in ipairs(CONTAINER_FRAMES) do
         local frame = _G[name]

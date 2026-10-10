@@ -1571,6 +1571,7 @@ end
 
 function Bags:Disable()
     ns.UnregisterAllEvents(self)
+    Bags.Blizzard.RestoreBagSetting()
     for _, window in pairs(Bags.windows) do
         window:Hide()
     end
