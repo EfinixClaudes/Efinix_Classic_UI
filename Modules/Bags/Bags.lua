@@ -675,28 +675,33 @@ function Bags.ReleaseBlizzardButtons(window)
     window.blizzardByBag = {}
 end
 
--- Quality frame drawn by the addon itself (the game's SetItemButtonQuality
--- stopped drawing it on these slots with a beta patch): grey for junk, the
--- quality colour from green up, nothing for white items.
-local QUALITY_FRAME = "Interface\\Common\\WhiteIconFrame"
+-- Quality glow drawn by the addon itself on a texture of its own: the game's
+-- quality frame (Interface\Common\WhiteIconFrame through SetItemButtonQuality)
+-- draws nothing on this client. The 1.12 UI-ActionButton-Border, additive and
+-- tinted in the quality colour, is the classic bag addon look: grey for junk,
+-- green and up in their colours, nothing for white items.
 local COMMON = Enum and Enum.ItemQuality and Enum.ItemQuality.Common or 1
+local qualityGlow = setmetatable({}, { __mode = "k" }) -- button -> texture
 
 local function paintQualityBorder(button, quality)
-    local border = button.IconBorder
-    if not border then
-        return
+    local glow = qualityGlow[button]
+    if not glow then
+        glow = button:CreateTexture(nil, "OVERLAY", nil, 2)
+        glow:SetTexture(Assets.Path("Button.Border"))
+        glow:SetBlendMode("ADD")
+        glow:SetSize(SLOT * 62 / 36, SLOT * 62 / 36) -- 62x62 around a 36 px button in 1.12
+        glow:SetPoint("CENTER", button, "CENTER", 0, 1)
+        qualityGlow[button] = glow
     end
     local r, g, b
     if quality and quality ~= COMMON and C_Item and C_Item.GetItemQualityColor then
         r, g, b = C_Item.GetItemQualityColor(quality)
     end
     if r then
-        border:SetTexture(QUALITY_FRAME)
-        border:SetVertexColor(r, g, b)
-        border:SetAlpha(1)
-        border:Show()
+        glow:SetVertexColor(r, g, b)
+        glow:Show()
     else
-        border:Hide()
+        glow:Hide()
     end
 end
 
