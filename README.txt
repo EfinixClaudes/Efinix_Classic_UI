@@ -118,7 +118,8 @@ Raid frames: the game's raid frames show in raids as usual; set them up in Edit
 Mode and the game's options. Tick "Hide the game's raid frames" in the options
 only if you want the 2006 way, the raid tab of the social window.
 Spellbook: P (or the spellbook button in the micro menu) opens the old two-page
-book with the skill tabs on the right. Drag spells to your bars as usual. It opens
+book with the skill tabs on the right. Right-click a pet ability in the pet tab
+to switch its autocast on or off. Drag spells to your bars as usual. It opens
 and closes in combat too, and Escape closes it. Clicking a spell in the book casts
 it, except during combat, where the game only lets you look, read tooltips and
 drag; casting from the book is back the moment the fight ends.

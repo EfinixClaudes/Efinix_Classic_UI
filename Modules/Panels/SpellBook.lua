@@ -167,6 +167,7 @@ local function updateButton(button)
         button:Disable()
         button.spellID = nil
         button.isPassive = nil
+        button.castName = nil
         return
     end
     button:Enable()
@@ -176,6 +177,9 @@ local function updateButton(button)
     end
     button.spellID = info.spellID
     button.isPassive = info.isPassive
+    -- "Name" or "Name(Rank 3)", exactly what /cast and CastSpellByName take
+    local subName = info.subName ~= "" and info.subName or nil
+    button.castName = subName and ("%s(%s)"):format(info.name, subName) or info.name
 
     button.Icon:SetTexture(info.iconID)
     button.Icon:Show()
@@ -239,17 +243,29 @@ end
 
 -- The secure cast button over a slot: plain left click casts. Attributes can
 -- only change out of combat; in combat the overlay is hidden anyway.
+-- Spells are cast by name through the game's own secure /cast, which also
+-- handles pet abilities and Beast Training (casting those by spell ID does
+-- not work); a right-click on a pet ability toggles its autocast through the
+-- secure /petautocasttoggle. Toggling it from addon code is blocked.
 local function updateAttributes(button)
     local secure = button.secure
     if not secure or InCombatLockdown() then
         return
     end
-    if button.slot and button.spellID and not button.isPassive then
-        secure:SetAttribute("type1", "spell")
-        secure:SetAttribute("spell", button.spellID)
+    secure:SetAttribute("spell", nil)
+    if button.slot and button.castName and not button.isPassive then
+        secure:SetAttribute("type1", "macro")
+        secure:SetAttribute("macrotext1", "/cast " .. button.castName)
     else
         secure:SetAttribute("type1", nil)
-        secure:SetAttribute("spell", nil)
+        secure:SetAttribute("macrotext1", nil)
+    end
+    if button.slot and button.castName and button.bank == petBank() then
+        secure:SetAttribute("type2", "macro")
+        secure:SetAttribute("macrotext2", "/petautocasttoggle " .. button.castName)
+    else
+        secure:SetAttribute("type2", "none")
+        secure:SetAttribute("macrotext2", nil)
     end
 end
 
@@ -260,8 +276,10 @@ local function onSpellClick(button, mouseButton)
     if IsModifiedClick("PICKUPACTION") then
         C_SpellBook.PickupSpellBookItem(button.slot, button.bank)
     elseif mouseButton ~= "LeftButton" and button.bank == petBank() then
-        C_SpellBook.ToggleSpellBookItemAutoCast(button.slot, button.bank)
-        updateButton(button)
+        -- the secure button toggled autocast; show the new state a moment later
+        C_Timer.After(0.2, function()
+            updateButton(button)
+        end)
     end
     button:SetChecked(button.spellID and IsCurrentSpell and IsCurrentSpell(button.spellID) == true)
 end
