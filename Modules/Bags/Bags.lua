@@ -675,6 +675,31 @@ function Bags.ReleaseBlizzardButtons(window)
     window.blizzardByBag = {}
 end
 
+-- Quality frame drawn by the addon itself (the game's SetItemButtonQuality
+-- stopped drawing it on these slots with a beta patch): grey for junk, the
+-- quality colour from green up, nothing for white items.
+local QUALITY_FRAME = "Interface\\Common\\WhiteIconFrame"
+local COMMON = Enum and Enum.ItemQuality and Enum.ItemQuality.Common or 1
+
+local function paintQualityBorder(button, quality)
+    local border = button.IconBorder
+    if not border then
+        return
+    end
+    local r, g, b
+    if quality and quality ~= COMMON and C_Item and C_Item.GetItemQualityColor then
+        r, g, b = C_Item.GetItemQualityColor(quality)
+    end
+    if r then
+        border:SetTexture(QUALITY_FRAME)
+        border:SetVertexColor(r, g, b)
+        border:SetAlpha(1)
+        border:Show()
+    else
+        border:Hide()
+    end
+end
+
 local function updateItemButton(button, bagID, slot)
     local info = C_Container.GetContainerItemInfo(bagID, slot)
     local hasItem = info ~= nil
@@ -690,6 +715,7 @@ local function updateItemButton(button, bagID, slot)
     else
         SetItemButtonQuality(button, nil)
     end
+    paintQualityBorder(button, hasItem and info.quality or nil)
     button:SetHasItem(hasItem)
     button:SetReadable(hasItem and info.isReadable)
 
@@ -784,6 +810,7 @@ local function paintOfflineButton(button, item, search)
     else
         SetItemButtonQuality(button, nil)
     end
+    paintQualityBorder(button, item and item.quality and item.quality >= 0 and item.quality or nil)
     local dim = false
     if item and search ~= "" then
         local name = offlineName(item.link)
