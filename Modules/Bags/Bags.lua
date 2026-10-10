@@ -661,6 +661,20 @@ local function styleBlizzardButton(button, own)
     end
 end
 
+-- The game's slot button draws nothing of its own: the game resets the
+-- button's own transparency whenever it refreshes the bag, so every texture
+-- and child frame on it (icon, count, quest frame, cooldown, highlight) is
+-- faded instead. It keeps taking the clicks; the addon's slot under it shows
+-- the item, the quality glow and the hover highlight.
+local function blankBlizzardButton(button)
+    for _, region in ipairs({ button:GetRegions() }) do
+        region:SetAlpha(0)
+    end
+    for _, child in ipairs({ button:GetChildren() }) do
+        child:SetAlpha(0)
+    end
+end
+
 -- Puts a game slot button back on its own (off-screen) container frame.
 local function releaseBlizzardButton(button)
     button:ClearAllPoints()
@@ -1046,6 +1060,7 @@ function Bags.RefreshWindow(kind, relayout)
                 local blizzard = kind == "inventory" and Bags.Blizzard.FindButton(bagID, slot)
                 if blizzard then
                     styleBlizzardButton(blizzard, own)
+                    blankBlizzardButton(blizzard)
                     blizzard:SetAlpha(0)
                     blizzard:SetFrameStrata("DIALOG")
                     blizzard:ClearAllPoints()
